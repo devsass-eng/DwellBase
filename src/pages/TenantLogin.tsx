@@ -120,7 +120,7 @@ const TenantLogin = () => {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center mt-2 disabled:opacity-70"
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center mt-2 disabled:opacity-70 cursor-pointer shadow-sm hover:shadow"
             >
               {loading ? (
                 <>
@@ -132,6 +132,26 @@ const TenantLogin = () => {
               )}
             </button>
           </form>
+
+          {/* Demo Credentials Box */}
+          <div className="mt-6 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-semibold text-slate-800">Demo Tenant Credentials</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIdentifier('TENT-01');
+                  setPassword('Tenant@1234');
+                  setError('');
+                }}
+                className="text-teal-600 hover:text-teal-700 font-semibold cursor-pointer underline text-xs"
+              >
+                Auto-fill Demo
+              </button>
+            </div>
+            <p><span className="text-slate-500 font-medium">Tenant ID:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-slate-800">TENT-01</code> (Kwesi Mensah)</p>
+            <p className="mt-1"><span className="text-slate-500 font-medium">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-slate-800">Tenant@1234</code></p>
+          </div>
         </div>
       </div>
     </div>

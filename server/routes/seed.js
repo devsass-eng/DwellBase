@@ -1,5 +1,6 @@
-﻿// POST /api/seed  — Seeds demo data for a landlord account (dev/demo only)
+// POST /api/seed  — Seeds demo data for a landlord account (dev/demo only)
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import pool from "../db.js";
 import { requireLandlord } from "../middleware/auth.js";
 
@@ -48,29 +49,30 @@ router.post("/", requireLandlord, async (req, res) => {
     const room2Id = r2.rows[0].id;
 
     // Tenants
+    const tenantPwHash = await bcrypt.hash("Tenant@1234", 12);
     const t1 = await client.query(
       `INSERT INTO tenants (landlord_id, tenant_id, full_name, phone, email, room_id, room_number, room_code,
         monthly_rent, start_date, duration_months, end_date, total_contractual_rent,
-        amount_paid, outstanding_balance, tenancy_status, account_status)
+        amount_paid, outstanding_balance, tenancy_status, account_status, password_hash)
        VALUES ($1,'TENT-01','Kwesi Mensah','0241234567','tenant@dwellbase.com',$2,'ROOM 1 (R1)','R1',
-         800,'2026-01-01',12,'2026-12-31',9600,950,60,'Active','Active') RETURNING id`,
-      [lid, room1Id]
+         800,'2026-01-01',12,'2026-12-31',9600,950,60,'Active','Active',$3) RETURNING id`,
+      [lid, room1Id, tenantPwHash]
     );
     const t2 = await client.query(
       `INSERT INTO tenants (landlord_id, tenant_id, full_name, phone, email, room_id, room_number, room_code,
         monthly_rent, start_date, duration_months, end_date, total_contractual_rent,
-        amount_paid, outstanding_balance, tenancy_status, account_status)
+        amount_paid, outstanding_balance, tenancy_status, account_status, password_hash)
        VALUES ($1,'TENT-02','Ama Osei','0544004400','ama.osei@dwellbase.demo',$2,'ROOM 2 (R2)','R2',
-         1200,'2026-03-01',12,'2027-02-28',14400,0,1320,'Active','Invitation Pending') RETURNING id`,
-      [lid, room2Id]
+         1200,'2026-03-01',12,'2027-02-28',14400,0,1320,'Active','Active',$3) RETURNING id`,
+      [lid, room2Id, tenantPwHash]
     );
     const t0 = await client.query(
       `INSERT INTO tenants (landlord_id, tenant_id, full_name, phone, email, room_id, room_number, room_code,
         monthly_rent, start_date, duration_months, end_date, total_contractual_rent,
-        amount_paid, outstanding_balance, tenancy_status, account_status)
+        amount_paid, outstanding_balance, tenancy_status, account_status, password_hash)
        VALUES ($1,'TENT-00','Kofi Boateng','0209876543','kofi.boateng@dwellbase.demo',$2,'ROOM 1 (R1)','R1',
-         750,'2025-01-01',12,'2025-12-31',9000,8700,300,'Ended','Suspended') RETURNING id`,
-      [lid, room1Id]
+         750,'2025-01-01',12,'2025-12-31',9000,8700,300,'Ended','Suspended',$3) RETURNING id`,
+      [lid, room1Id, tenantPwHash]
     );
     const tenant1Id = t1.rows[0].id;
     const tenant2Id = t2.rows[0].id;
