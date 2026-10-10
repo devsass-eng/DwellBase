@@ -124,6 +124,7 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
           <div className="p-4 border-t border-navy-800">
             <Link 
               to="/"
+              onClick={() => localStorage.removeItem('dwellbase_auth')}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-200 hover:bg-navy-800 hover:text-red-400 transition-colors"
             >
               <LogOut className="w-5 h-5" />
@@ -233,6 +234,7 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
                   <div className="h-px bg-gray-100 my-1"></div>
                   <Link 
                     to="/"
+                    onClick={() => localStorage.removeItem('dwellbase_auth')}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
                   >
                     <LogOut className="w-4 h-4" /> Logout

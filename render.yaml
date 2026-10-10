@@ -1,0 +1,17 @@
+﻿services:
+  - type: web
+    name: dwellbase-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false   # Set manually in Render dashboard
+      - key: JWT_SECRET
+        sync: false   # Set manually in Render dashboard
+      - key: FRONTEND_URL
+        sync: false   # Set to your Netlify URL after deploying
+      - key: NODE_ENV
+        value: production

@@ -24,12 +24,15 @@ const TenantLogin = () => {
     // Simulate authentication
     setTimeout(() => {
       setLoading(false);
-      if (identifier === 'tenant@dwellbase.com' && password === 'password') {
+      if (identifier === 'kofi.boateng@dwellbase.demo' || identifier === 'TENT-00') {
+         setError('Your tenant login access has been revoked. All historical tenancy and financial records remain preserved with property management.');
+      } else if ((identifier === 'tenant@dwellbase.com' || identifier === 'TENT-01') && password === 'password') {
+         localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'tenant', identifier, name: 'Kwesi Mensah', tenantId: 'tenant-1' }));
          navigate('/tenant/dashboard');
       } else {
          setError('Invalid credentials. (Hint: use tenant@dwellbase.com / password)');
       }
-    }, 1500);
+    }, 600);
   };
 
   return (

@@ -1,19 +1,28 @@
 import { useState, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppData } from '../context/AppDataContext';
+import type { Tenant } from '../context/AppDataContext';
+import { formatGHS, formatReadableDate } from '../utils/reportUtils';
 import { 
-  Plus, Search, Filter, MoreVertical, 
-  UserPlus, Mail, Phone,
-  DollarSign, X,
-  AlertCircle, BedDouble
+  Plus, Search, Filter, 
+  UserPlus,
+  X, AlertCircle, Edit3, Trash2,
+  AlertTriangle, Eye, ShieldCheck
 } from 'lucide-react';
 
 const TenantsManagement = () => {
-  const { rooms, tenants, addTenant } = useAppData();
+  const { rooms, tenants, charges, addTenant, updateTenant, removeTenant, landlordProfile } = useAppData();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Modals for Actions
+  const [viewingTenant, setViewingTenant] = useState<Tenant | null>(null);
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [editForm, setEditForm] = useState({ fullName: '', phone: '', email: '', monthlyRent: 0 });
+  const [removingTenant, setRemovingTenant] = useState<Tenant | null>(null);
+  const [removalReason, setRemovalReason] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -109,7 +118,7 @@ const TenantsManagement = () => {
         endDate: calculatedEndDate,
         totalContractualRent,
         amountPaid: 0,
-        outstandingBalance: totalContractualRent,
+        outstandingBalance: 0, // Charges will track actual billing
         tenancyStatus: new Date(formData.startDate) > new Date() ? 'Upcoming' : 'Active',
         accountStatus: formData.createLogin === 'now' ? 'Invitation Pending' : 'Not Set Up'
       });
@@ -117,32 +126,48 @@ const TenantsManagement = () => {
       setIsSubmitting(false);
       setIsAddModalOpen(false);
       resetForm();
-    }, 1000);
+    }, 600);
   };
 
-  const formatCurrency = (amount: number) =>
-    `GH₵${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTenant) return;
+    updateTenant(editingTenant.id, {
+      fullName: editForm.fullName,
+      phone: editForm.phone,
+      email: editForm.email,
+      monthlyRent: editForm.monthlyRent,
+    });
+    setEditingTenant(null);
+  };
+
+  const handleConfirmRemoval = () => {
+    if (!removingTenant) return;
+    removeTenant(removingTenant.id, removalReason);
+    setRemovingTenant(null);
+    setRemovalReason('');
+  };
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
-      'Active': 'bg-emerald-50 text-emerald-700',
-      'Upcoming': 'bg-blue-50 text-blue-700',
-      'Expiring Soon': 'bg-amber-50 text-amber-700',
-      'Expired': 'bg-red-50 text-red-700',
-      'Ended': 'bg-gray-100 text-gray-600',
+      'Active': 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      'Upcoming': 'bg-blue-50 text-blue-700 border border-blue-200',
+      'Expiring Soon': 'bg-amber-50 text-amber-700 border border-amber-200',
+      'Expired': 'bg-red-50 text-red-700 border border-red-200',
+      'Ended': 'bg-gray-100 text-gray-600 border border-gray-200',
     };
     return map[status] || 'bg-gray-100 text-gray-600';
   };
 
   return (
-    <DashboardLayout userType="landlord" userName="Sarah Landlord">
+    <DashboardLayout userType="landlord" userName={landlordProfile.fullName}>
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Tenants</h2>
-            <p className="text-slate-500 mt-1">Manage tenant information, accommodation, tenancy periods, and rent agreements.</p>
+            <p className="text-slate-500 mt-1">Manage tenant profiles, room allocations, agreements, and login access.</p>
           </div>
           <button
             onClick={() => { resetForm(); setIsAddModalOpen(true); }}
@@ -162,7 +187,7 @@ const TenantsManagement = () => {
               placeholder="Search by name, ID, phone, or room..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors text-sm"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -170,7 +195,7 @@ const TenantsManagement = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 text-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none py-2.5 pl-3 pr-8"
+              className="bg-gray-50 border border-gray-200 text-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none py-2.5 pl-3 pr-8 text-sm"
             >
               <option value="All">All Statuses</option>
               <option value="Active">Active</option>
@@ -224,22 +249,53 @@ const TenantsManagement = () => {
                         {tenant.email && <div className="text-xs text-slate-400 mt-0.5">{tenant.email}</div>}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-medium text-slate-800">Room {tenant.roomNumber}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{formatCurrency(tenant.monthlyRent)}/mo</div>
+                        <div className="font-medium text-slate-800">{tenant.roomNumber}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{formatGHS(tenant.monthlyRent)}/mo</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-xs text-slate-500">{new Date(tenant.startDate).toLocaleDateString()} →</div>
-                        <div className="text-xs text-slate-500">{new Date(tenant.endDate).toLocaleDateString()}</div>
+                        <div className="text-xs text-slate-500">{formatReadableDate(tenant.startDate)} →</div>
+                        <div className="text-xs text-slate-500">{formatReadableDate(tenant.endDate)}</div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(tenant.tenancyStatus)}`}>
                           {tenant.tenancyStatus}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-slate-400 hover:text-teal-600 p-2 rounded-lg hover:bg-teal-50 transition-colors">
-                          <MoreVertical className="w-5 h-5" />
+                      <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                        <button 
+                          onClick={() => setViewingTenant(tenant)}
+                          className="px-2.5 py-1 text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors inline-flex items-center gap-1"
+                          title="View Details"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Details
                         </button>
+                        <button 
+                          onClick={() => {
+                            setEditingTenant(tenant);
+                            setEditForm({
+                              fullName: tenant.fullName,
+                              phone: tenant.phone,
+                              email: tenant.email,
+                              monthlyRent: tenant.monthlyRent
+                            });
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors inline-flex items-center gap-1"
+                          title="Edit Profile"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        {tenant.tenancyStatus !== 'Ended' && (
+                          <button 
+                            onClick={() => {
+                              setRemovingTenant(tenant);
+                              setRemovalReason('');
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors inline-flex items-center gap-1"
+                            title="End Tenancy & Remove Tenant"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> End Tenancy
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -252,6 +308,146 @@ const TenantsManagement = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: VIEW TENANT DETAILS ────────────────────────────────────── */}
+        {viewingTenant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-navy-900/40 backdrop-blur-sm" onClick={() => setViewingTenant(null)} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="text-lg font-bold text-slate-900">Tenant Profile</h3>
+                <button onClick={() => setViewingTenant(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div><span className="text-xs text-slate-400 block">Full Name</span><strong>{viewingTenant.fullName}</strong></div>
+                <div><span className="text-xs text-slate-400 block">Tenant ID</span><span className="font-mono">{viewingTenant.tenantId}</span></div>
+                <div><span className="text-xs text-slate-400 block">Contact</span><span>{viewingTenant.phone} • {viewingTenant.email || 'No email provided'}</span></div>
+                <div><span className="text-xs text-slate-400 block">Assigned Room</span><strong>{viewingTenant.roomNumber}</strong></div>
+                <div><span className="text-xs text-slate-400 block">Contract Period</span><span>{formatReadableDate(viewingTenant.startDate)} to {formatReadableDate(viewingTenant.endDate)}</span></div>
+                <div><span className="text-xs text-slate-400 block">Agreed Monthly Rent</span><strong>{formatGHS(viewingTenant.monthlyRent)}</strong></div>
+                <div><span className="text-xs text-slate-400 block">Tenancy Status</span><span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadge(viewingTenant.tenancyStatus)}`}>{viewingTenant.tenancyStatus}</span></div>
+                <div><span className="text-xs text-slate-400 block">Login Account</span><span className="font-semibold text-teal-700">{viewingTenant.accountStatus}</span></div>
+              </div>
+              <div className="flex justify-end pt-3 border-t">
+                <button onClick={() => setViewingTenant(null)} className="px-4 py-2 bg-navy-900 text-white rounded-xl text-xs font-semibold">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: EDIT TENANT ────────────────────────────────────────────── */}
+        {editingTenant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-navy-900/40 backdrop-blur-sm" onClick={() => setEditingTenant(null)} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="text-lg font-bold text-slate-900">Edit Tenant Details</h3>
+                <button onClick={() => setEditingTenant(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={editForm.fullName} 
+                    onChange={e => setEditForm({ ...editForm, fullName: e.target.value })} 
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
+                  <input 
+                    type="tel" 
+                    required 
+                    value={editForm.phone} 
+                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })} 
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Email</label>
+                  <input 
+                    type="email" 
+                    value={editForm.email} 
+                    onChange={e => setEditForm({ ...editForm, email: e.target.value })} 
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Agreed Monthly Rent (GH₵)</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    required 
+                    value={editForm.monthlyRent} 
+                    onChange={e => setEditForm({ ...editForm, monthlyRent: parseFloat(e.target.value) || 0 })} 
+                    className="w-full px-3 py-2 border rounded-xl text-sm"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-3 border-t">
+                  <button type="button" onClick={() => setEditingTenant(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-gray-100 rounded-xl">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-semibold hover:bg-teal-700">Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: CONFIRM END TENANCY & REMOVAL ──────────────────────────── */}
+        {removingTenant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => setRemovingTenant(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center gap-3 text-rose-600">
+                <AlertTriangle className="w-6 h-6 shrink-0" />
+                <h3 className="text-lg font-bold">End Tenancy & Remove Tenant</h3>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Are you sure you want to end the tenancy for <strong>{removingTenant.fullName}</strong> ({removingTenant.tenantId}) in <strong>{removingTenant.roomNumber}</strong>?
+              </p>
+
+              {/* Debt Preservation Notice */}
+              {charges.filter(c => c.tenantId === removingTenant.id && c.status !== 'paid').reduce((s, c) => s + c.remainingBalance, 0) > 0 && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+                  <strong>Important — Preserved Debt:</strong>
+                  <p>
+                    This tenant has an outstanding balance of <strong>{formatGHS(charges.filter(c => c.tenantId === removingTenant.id && c.status !== 'paid').reduce((s, c) => s + c.remainingBalance, 0))}</strong>.
+                    Per DwellBase regulations, their debt will remain permanently attached to their historical record and will never be cancelled or transferred to a replacement tenant.
+                  </p>
+                </div>
+              )}
+
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-slate-600">
+                <ShieldCheck className="w-4 h-4 text-teal-600 inline mr-1" />
+                Historical records, past payments, and issued receipts will remain permanently searchable under <strong>History & Reports &gt; Former Tenants</strong>.
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Reason for Ending Tenancy (Required for Audit Trail)</label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="e.g., Contract expired; tenant moved out."
+                  value={removalReason}
+                  onChange={e => setRemovalReason(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setRemovingTenant(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-gray-100 rounded-xl">Cancel</button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRemoval}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold hover:bg-rose-700"
+                >
+                  Confirm End of Tenancy
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -279,188 +475,53 @@ const TenantsManagement = () => {
                   </div>
                 )}
 
-                <form id="add-tenant-form" onSubmit={handleSaveTenant} className="space-y-8">
-
-                  {/* Section A: Personal Information */}
+                <form id="add-tenant-form" onSubmit={handleSaveTenant} className="space-y-6">
+                  {/* Section A: Basic Info */}
                   <section>
                     <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                      1. Personal Information
+                      1. Basic Information
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="md:col-span-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Generated Tenant ID</label>
+                        <input type="text" disabled value={generatedTenantId} className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-slate-500 font-mono text-sm" />
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Full Name <span className="text-red-500">*</span></label>
-                        <div className="relative">
-                          <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input type="text" required value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none" placeholder="Enter full legal name" />
-                        </div>
+                        <input type="text" required placeholder="e.g. John Mensah" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input type="tel" required value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none" placeholder="e.g. 024 123 4567" />
-                        </div>
+                        <input type="tel" required placeholder="e.g. 0244123456" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email Address <span className="text-gray-400 font-normal text-xs">(Optional)</span></label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none" placeholder="tenant@example.com" />
-                        </div>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tenant ID <span className="text-gray-400 font-normal text-xs">(Auto-generated)</span></label>
-                        <input type="text" readOnly value={generatedTenantId} className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-slate-400 font-mono text-sm outline-none cursor-not-allowed" />
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                        <input type="email" placeholder="e.g. john@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm" />
                       </div>
                     </div>
                   </section>
 
-                  {/* Section B: Accommodation & Tenancy */}
+                  {/* Section B: Accommodation */}
                   <section>
                     <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                      2. Accommodation & Tenancy
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                      {/* Room Number */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Room Number <span className="text-red-500">*</span></label>
-                        {vacantRooms.length === 0 ? (
-                          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                            <BedDouble className="w-5 h-5 text-amber-500 shrink-0" />
-                            <p className="text-sm text-amber-700">
-                              {rooms.length === 0
-                                ? 'No rooms added yet. Go to Rooms to add rooms first.'
-                                : 'All rooms are currently occupied. No vacant rooms available.'}
-                            </p>
-                          </div>
-                        ) : (
-                          <select
-                            required
-                            value={formData.roomId}
-                            onChange={e => setFormData({ ...formData, roomId: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
-                          >
-                            <option value="">Select a vacant room</option>
-                            {vacantRooms.map(room => (
-                              <option key={room.id} value={room.id}>
-                                {room.roomNumber}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-
-                      {/* Monthly Rent — read-only, auto-filled from room */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Monthly Rent (GH₵)</label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input
-                            type="text"
-                            readOnly
-                            value={selectedRoom ? formatCurrency(selectedRoom.monthlyRent) : '— Select a room first —'}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-slate-500 outline-none cursor-not-allowed font-medium"
-                          />
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">Set when you added the room. Select a room to see its rent.</p>
-                      </div>
-
-                      {/* Start Date */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tenancy Start Date <span className="text-red-500">*</span></label>
-                        <input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none" />
-                      </div>
-
-                      {/* Duration */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tenancy Duration <span className="text-red-500">*</span></label>
-                        <select
-                          required
-                          value={formData.durationMonths}
-                          onChange={e => setFormData({ ...formData, durationMonths: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
-                        >
-                          <option value="6">6 months</option>
-                          <option value="12">1 year</option>
-                          <option value="24">2 years</option>
-                          <option value="36">3 years</option>
-                          <option value="48">4 years</option>
-                          <option value="60">5 years</option>
-                          <option value="custom">Custom Duration</option>
-                        </select>
-                        {formData.durationMonths === 'custom' && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <input type="number" required min="1" placeholder="Number of months" value={formData.customDuration} onChange={e => setFormData({ ...formData, customDuration: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none" />
-                            <span className="text-sm text-gray-500 shrink-0">months</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Calculated Summary */}
-                      <div className="md:col-span-2 bg-navy-50 rounded-xl p-5 border border-navy-100">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <span className="block text-xs font-semibold text-navy-600 uppercase tracking-wider mb-1">Calculated End Date</span>
-                            <span className="text-lg font-semibold text-slate-800">
-                              {calculatedEndDate ? new Date(calculatedEndDate).toLocaleDateString('en-GH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-xs font-semibold text-navy-600 uppercase tracking-wider mb-1">Total Contractual Rent</span>
-                            <span className="text-2xl font-bold text-teal-700">
-                              {selectedRoom && activeDuration ? formatCurrency(totalContractualRent) : '—'}
-                            </span>
-                            {selectedRoom && activeDuration > 0 && (
-                              <span className="block text-xs text-slate-400 mt-0.5">
-                                {formatCurrency(selectedRoom.monthlyRent)} × {activeDuration} months
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Section C: Account Access */}
-                  <section>
-                    <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                      3. Tenant Account Access
+                      2. Accommodation & Tenancy Agreement
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {[
-                        {
-                          value: 'now',
-                          title: 'Create Tenant Login Now',
-                          desc: 'Tenant will receive instructions to set up their password and access their dashboard.',
-                          color: 'teal'
-                        },
-                        {
-                          value: 'later',
-                          title: 'Set Up Tenant Login Later',
-                          desc: 'Save records without granting dashboard access. You can invite them at any time.',
-                          color: 'navy'
-                        }
-                      ].map(opt => (
-                        <label
-                          key={opt.value}
-                          className={`flex items-start gap-3 p-4 cursor-pointer rounded-xl border-2 transition-colors ${formData.createLogin === opt.value
-                            ? `border-${opt.color}-500 bg-${opt.color}-50/40`
-                            : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                        >
-                          <input type="radio" name="createLogin" value={opt.value} checked={formData.createLogin === opt.value} onChange={() => setFormData({ ...formData, createLogin: opt.value })} className="sr-only" />
-                          <div className={`w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${formData.createLogin === opt.value ? `border-${opt.color}-500` : 'border-gray-300'}`}>
-                            {formData.createLogin === opt.value && <div className={`w-2 h-2 rounded-full bg-${opt.color}-500`} />}
-                          </div>
-                          <div>
-                            <span className="block text-sm font-semibold text-slate-700">{opt.title}</span>
-                            <span className="block text-xs text-slate-500 mt-0.5">{opt.desc}</span>
-                          </div>
-                        </label>
-                      ))}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Assign Room <span className="text-red-500">*</span></label>
+                        <select required value={formData.roomId} onChange={(e) => setFormData({ ...formData, roomId: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                          <option value="">Select a vacant room</option>
+                          {vacantRooms.map(r => (
+                            <option key={r.id} value={r.id}>{r.roomNumber} — {formatGHS(r.monthlyRent)}/mo</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tenancy Start Date <span className="text-red-500">*</span></label>
+                        <input type="date" required value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm" />
+                      </div>
                     </div>
                   </section>
-
                 </form>
               </div>
 
@@ -475,12 +536,7 @@ const TenantsManagement = () => {
                   disabled={isSubmitting || vacantRooms.length === 0}
                   className="px-6 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-xl hover:bg-teal-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : 'Save Tenant'}
+                  {isSubmitting ? 'Saving...' : 'Save Tenant'}
                 </button>
               </div>
 

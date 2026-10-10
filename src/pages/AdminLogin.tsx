@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
+import { auth, setToken } from '../api/client';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -10,27 +11,29 @@ const AdminLogin = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!email || !password) {
       setError('Please enter both email and password.');
       return;
     }
-    
+
     setLoading(true);
-    
-    // Simulate authentication
-    setTimeout(() => {
+    try {
+      const res = await auth.landlordLogin(email.trim(), password);
+      setToken(res.token);
+      localStorage.setItem('dwellbase_role', 'landlord');
+      localStorage.setItem('dwellbase_user', JSON.stringify(res.landlord));
+      // Keep legacy key for ProtectedRoute compatibility
+      localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'landlord', email: email.trim() }));
+      navigate('/landlord/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
       setLoading(false);
-      // Simulating a success check. Normally would check with a backend.
-      if (email === 'admin@dwellbase.com' && password === 'password') {
-         navigate('/landlord/dashboard');
-      } else {
-         setError('Invalid credentials. (Hint: use admin@dwellbase.com / password)');
-      }
-    }, 1500);
+    }
   };
 
   return (

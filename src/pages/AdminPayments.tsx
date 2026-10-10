@@ -58,7 +58,8 @@ type Tab = 'all' | 'cash' | 'momo' | 'charges' | 'categories';
 const AdminPayments = () => {
   const {
     tenants, payments, charges, categories, landlordProfile,
-    recordCashPayment, issueCharge, addCategory, archiveCategory
+    recordCashPayment, issueCharge, addCategory, archiveCategory,
+    updatePaymentStatus
   } = useAppData();
   const { notify } = useNotifications();
 
@@ -362,10 +363,47 @@ const AdminPayments = () => {
                               {p.status.replace('_', ' ')}
                             </span>
                           </td>
-                          <td className="px-5 py-3 text-right">
-                            <button onClick={() => setSelectedPayment(p)} className="p-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors flex items-center justify-end gap-1.5 ml-auto text-xs font-medium">
-                              <Receipt className="w-4 h-4" /> Receipt
-                            </button>
+                          <td className="px-5 py-3 text-right space-x-2 whitespace-nowrap">
+                            {(p.status === 'pending' || p.status === 'processing') && (
+                              <>
+                                <button 
+                                  onClick={() => {
+                                    updatePaymentStatus(p.id, 'successful');
+                                    notify({
+                                      recipientType: 'landlord',
+                                      title: 'Payment Verified & Confirmed',
+                                      message: `Payment of ${formatGHS(p.amount)} for ${p.tenantName} confirmed. Official receipt generated.`,
+                                      type: 'success',
+                                    });
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                                >
+                                  Verify & Approve
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    updatePaymentStatus(p.id, 'failed');
+                                    notify({
+                                      recipientType: 'landlord',
+                                      title: 'Payment Rejected',
+                                      message: `Payment submission of ${formatGHS(p.amount)} for ${p.tenantName} rejected.`,
+                                      type: 'warning',
+                                    });
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                            {p.status === 'successful' && (
+                              <button onClick={() => setSelectedPayment(p)} className="p-1.5 px-2.5 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors inline-flex items-center gap-1.5 text-xs font-semibold">
+                                <Receipt className="w-4 h-4" /> Receipt
+                              </button>
+                            )}
+                            {(p.status === 'failed' || p.status === 'reversed') && (
+                              <span className="text-xs text-slate-400 italic">No receipt</span>
+                            )}
                           </td>
                         </tr>
                       ))}
