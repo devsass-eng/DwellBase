@@ -18,6 +18,19 @@ services:
       - key: FRONTEND_URL
         value: "*"
 
+  - type: web
+    name: dwellbase-app
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://dwellbase-api.onrender.com
+
 databases:
   - name: dwellbase-db
     databaseName: dwellbase
