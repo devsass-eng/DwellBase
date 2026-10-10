@@ -4,26 +4,43 @@
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ??? Landlords (admin accounts) ?????????????????????????????????????????????
-CREATE TABLE IF NOT EXISTS landlords (
+-- ─── Super Admins (Platform Super Administrators) ───────────────────────────
+CREATE TABLE IF NOT EXISTS super_admins (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name     TEXT NOT NULL,
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  phone         TEXT,
-  property_name TEXT DEFAULT ''::TEXT,
-  property_address TEXT DEFAULT ''::TEXT,
-  momo_network  TEXT DEFAULT ''::TEXT,
-  momo_name     TEXT DEFAULT ''::TEXT,
-  momo_number   TEXT DEFAULT ''::TEXT,
-  payment_instructions TEXT DEFAULT ''::TEXT,
-  notif_new_tenant     BOOLEAN DEFAULT TRUE,
-  notif_manual_momo    BOOLEAN DEFAULT TRUE,
-  notif_confirmed_payment BOOLEAN DEFAULT TRUE,
-  notif_upcoming_charges BOOLEAN DEFAULT FALSE,
-  notif_overdue_charges  BOOLEAN DEFAULT TRUE,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Landlords (Admin Accounts) ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS landlords (
+  id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name                   TEXT NOT NULL,
+  email                       TEXT NOT NULL UNIQUE,
+  password_hash               TEXT NOT NULL,
+  phone                       TEXT,
+  property_name               TEXT DEFAULT ''::TEXT,
+  property_address            TEXT DEFAULT ''::TEXT,
+  subscription_plan           TEXT DEFAULT 'Standard' CHECK (subscription_plan IN ('Starter','Standard','Pro','Enterprise')),
+  subscription_duration_months INTEGER DEFAULT 12,
+  subscription_start_date     DATE DEFAULT CURRENT_DATE,
+  subscription_end_date       DATE DEFAULT (CURRENT_DATE + INTERVAL '12 months'),
+  account_status              TEXT DEFAULT 'Active' CHECK (account_status IN ('Active','Suspended','Expired','Pending Activation')),
+  reset_token                 TEXT,
+  reset_token_expires_at      TIMESTAMPTZ,
+  momo_network                TEXT DEFAULT ''::TEXT,
+  momo_name                   TEXT DEFAULT ''::TEXT,
+  momo_number                 TEXT DEFAULT ''::TEXT,
+  payment_instructions        TEXT DEFAULT ''::TEXT,
+  notif_new_tenant            BOOLEAN DEFAULT TRUE,
+  notif_manual_momo           BOOLEAN DEFAULT TRUE,
+  notif_confirmed_payment     BOOLEAN DEFAULT TRUE,
+  notif_upcoming_charges      BOOLEAN DEFAULT FALSE,
+  notif_overdue_charges       BOOLEAN DEFAULT TRUE,
+  created_at                  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                  TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ??? Rooms ???????????????????????????????????????????????????????????????????
@@ -156,7 +173,21 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ??? Indexes ?????????????????????????????????????????????????????????????????
+-- ─── Super Admin Audit Logs ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS super_admin_audit_logs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  super_admin_id    UUID REFERENCES super_admins(id) ON DELETE SET NULL,
+  super_admin_name  TEXT NOT NULL,
+  action            TEXT NOT NULL, -- e.g. CREATE_LANDLORD, ACTIVATE_ACCOUNT, SUSPEND_ACCOUNT, RENEW_SUBSCRIPTION, CHANGE_PLAN, RESET_ACCESS, EDIT_LANDLORD
+  landlord_id       UUID REFERENCES landlords(id) ON DELETE CASCADE,
+  landlord_name     TEXT NOT NULL,
+  details           JSONB DEFAULT '{}'::JSONB,
+  notes             TEXT DEFAULT '',
+  ip_address        TEXT,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Indexes ─────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_rooms_landlord ON rooms(landlord_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_landlord ON tenants(landlord_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_room ON tenants(room_id);
@@ -167,3 +198,6 @@ CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_payments_charge ON payments(charge_id);
 CREATE INDEX IF NOT EXISTS idx_regulations_landlord ON regulations(landlord_id);
 CREATE INDEX IF NOT EXISTS idx_audit_landlord ON audit_logs(landlord_id);
+CREATE INDEX IF NOT EXISTS idx_super_admin_audit_landlord ON super_admin_audit_logs(landlord_id);
+CREATE INDEX IF NOT EXISTS idx_super_admin_audit_action ON super_admin_audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_super_admin_audit_created ON super_admin_audit_logs(created_at DESC);

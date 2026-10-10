@@ -73,6 +73,15 @@ const WelcomePage = () => {
               </div>
             </Link>
           </div>
+
+          <div className="mt-10 text-center pt-6 border-t border-gray-100">
+            <Link 
+              to="/superadmin-login" 
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors font-medium"
+            >
+              <span>Platform Governance &bull; Super Admin Portal</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

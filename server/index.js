@@ -13,6 +13,7 @@ import regulationRoutes from "./routes/regulations.js";
 import settingsRoutes from "./routes/settings.js";
 import reportsRoutes from "./routes/reports.js";
 import seedRoutes from "./routes/seed.js";
+import superadminRoutes from "./routes/superadmin.js";
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use("/api/regulations", regulationRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/seed", seedRoutes);
+app.use("/api/superadmin", superadminRoutes);
 
 // ─── Global error handler ────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {

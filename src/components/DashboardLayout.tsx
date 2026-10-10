@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, DoorOpen, 
   CreditCard, FileText, Settings, LogOut, 
   Menu, X, Bell, Cloud, User as UserIcon, CheckCheck,
-  ClipboardList
+  ClipboardList, Building2, ShieldCheck
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -17,7 +17,7 @@ interface NavItem {
 
 interface DashboardLayoutProps {
   children: ReactNode;
-  userType: 'landlord' | 'tenant';
+  userType: 'landlord' | 'tenant' | 'super_admin';
   userName: string;
   tenantId?: string; // pass for tenant portal for scoped notifications
 }
@@ -30,14 +30,21 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
 
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const recipientType = userType === 'landlord' ? 'landlord' : 'tenant';
-  const unread = unreadCount(recipientType, tenantId);
+  const unread = userType === 'super_admin' ? 0 : unreadCount(recipientType, tenantId);
 
   // Filter notifications relevant to this user
-  const myNotifications = notifications.filter(n => {
+  const myNotifications = userType === 'super_admin' ? [] : notifications.filter(n => {
     if (n.recipientType !== recipientType) return false;
     if (tenantId && n.recipientId && n.recipientId !== tenantId) return false;
     return true;
   }).slice(0, 20);
+
+  const superAdminNav: NavItem[] = [
+    { name: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
+    { name: 'Landlords', path: '/superadmin/landlords', icon: Building2 },
+    { name: 'Audit Logs', path: '/superadmin/audit-logs', icon: ShieldCheck },
+    { name: 'Settings', path: '/superadmin/settings', icon: Settings },
+  ];
 
   const landlordNav: NavItem[] = [
     { name: 'Dashboard', path: '/landlord/dashboard', icon: LayoutDashboard },
@@ -57,7 +64,11 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
     { name: 'Settings', path: '/tenant/settings', icon: Settings },
   ];
 
-  const navItems = userType === 'landlord' ? landlordNav : tenantNav;
+  const navItems = userType === 'super_admin' 
+    ? superAdminNav 
+    : userType === 'landlord' 
+      ? landlordNav 
+      : tenantNav;
 
   const getPageTitle = () => {
     const item = navItems.find(nav => location.pathname.startsWith(nav.path));
@@ -123,8 +134,13 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
 
           <div className="p-4 border-t border-navy-800">
             <Link 
-              to="/"
-              onClick={() => localStorage.removeItem('dwellbase_auth')}
+              to={userType === 'super_admin' ? '/superadmin-login' : '/'}
+              onClick={() => {
+                localStorage.removeItem('dwellbase_auth');
+                localStorage.removeItem('dwellbase_token');
+                localStorage.removeItem('dwellbase_role');
+                localStorage.removeItem('dwellbase_user');
+              }}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-200 hover:bg-navy-800 hover:text-red-400 transition-colors"
             >
               <LogOut className="w-5 h-5" />
@@ -216,9 +232,13 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
               >
                 <div className="hidden sm:block text-right">
                   <div className="text-sm font-medium text-gray-700">{userName}</div>
-                  <div className="text-xs text-gray-500 capitalize">{userType}</div>
+                  <div className="text-xs text-gray-500 font-medium">
+                    {userType === 'super_admin' ? 'Super Admin' : userType.charAt(0).toUpperCase() + userType.slice(1)}
+                  </div>
                 </div>
-                <div className="w-9 h-9 rounded-full bg-navy-100 text-navy-700 flex items-center justify-center hover:bg-navy-200 transition-colors">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                  userType === 'super_admin' ? 'bg-amber-100 text-amber-800' : 'bg-navy-100 text-navy-700'
+                }`}>
                   <UserIcon className="w-5 h-5" />
                 </div>
               </button>
@@ -226,15 +246,20 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
               {isProfileMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                   <Link 
-                    to={`/${userType}/settings`}
+                    to={userType === 'super_admin' ? '/superadmin/settings' : `/${userType}/settings`}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-gray-50"
                   >
                     <Settings className="w-4 h-4" /> Settings
                   </Link>
                   <div className="h-px bg-gray-100 my-1"></div>
                   <Link 
-                    to="/"
-                    onClick={() => localStorage.removeItem('dwellbase_auth')}
+                    to={userType === 'super_admin' ? '/superadmin-login' : '/'}
+                    onClick={() => {
+                      localStorage.removeItem('dwellbase_auth');
+                      localStorage.removeItem('dwellbase_token');
+                      localStorage.removeItem('dwellbase_role');
+                      localStorage.removeItem('dwellbase_user');
+                    }}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
                   >
                     <LogOut className="w-4 h-4" /> Logout

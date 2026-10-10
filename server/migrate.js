@@ -1,4 +1,4 @@
-﻿// Run once: node server/migrate.js
+// Run once: node server/migrate.js
 // Seeds default billing categories for the landlord account
 
 import pool from "./db.js";
@@ -15,10 +15,37 @@ async function migrate() {
   
   try {
     await pool.query(sql);
-    console.log("Schema created successfully.");
+    // Alter existing tables if needed for smooth upgrades
+    await pool.query(`
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS subscription_plan TEXT DEFAULT 'Standard';
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS subscription_duration_months INTEGER DEFAULT 12;
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS subscription_start_date DATE DEFAULT CURRENT_DATE;
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS subscription_end_date DATE DEFAULT (CURRENT_DATE + INTERVAL '12 months');
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS account_status TEXT DEFAULT 'Active';
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS reset_token TEXT;
+      ALTER TABLE landlords ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMPTZ;
+    `);
+    console.log("Schema created and updated successfully.");
   } catch (err) {
     console.error("Schema error:", err.message);
     throw err;
+  }
+
+  // ─── Seed Default Super Admin ──────────────────────────────────────────────
+  const superEmail = process.env.SUPERADMIN_EMAIL || "superadmin@dwellbase.com";
+  const superPassword = process.env.SUPERADMIN_PASSWORD || "SuperAdmin@1234";
+  const superFullName = process.env.SUPERADMIN_NAME || "System Super Administrator";
+
+  const existingSuper = await pool.query("SELECT id FROM super_admins WHERE email=$1", [superEmail]);
+  if (existingSuper.rows.length === 0) {
+    const superHash = await bcrypt.hash(superPassword, 12);
+    await pool.query(
+      "INSERT INTO super_admins (full_name, email, password_hash) VALUES ($1,$2,$3)",
+      [superFullName, superEmail, superHash]
+    );
+    console.log("Created Super Admin account:", superEmail, "/ password:", superPassword);
+  } else {
+    console.log("Super Admin account already exists:", superEmail);
   }
 
   // Create default landlord account if SEED_EMAIL is set
@@ -35,7 +62,8 @@ async function migrate() {
   } else {
     const hash = await bcrypt.hash(password, 12);
     const res = await pool.query(
-      "INSERT INTO landlords (full_name, email, password_hash, property_name) VALUES ($1,$2,$3,$4) RETURNING id",
+      `INSERT INTO landlords (full_name, email, password_hash, property_name, subscription_plan, subscription_duration_months, account_status)
+       VALUES ($1,$2,$3,$4,'Standard',12,'Active') RETURNING id`,
       [fullName, email, hash, propertyName]
     );
     landlordId = res.rows[0].id;
