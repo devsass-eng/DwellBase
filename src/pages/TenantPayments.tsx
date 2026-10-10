@@ -77,13 +77,13 @@ const TenantPayments = () => {
     setMomoResult(null);
   };
 
-  const handleInitiateMomo = () => {
+  const handleInitiateMomo = async () => {
     if (!myTenant || !selectedCharge || !selectedNetwork) return;
     const amount = parseFloat(payAmount);
     if (isNaN(amount) || amount <= 0 || amount > selectedCharge.remainingBalance + 0.001) return;
 
     setMomoStep('processing');
-    const pending = initiateMoneyPayment({
+    const pending = await initiateMoneyPayment({
       tenantId: myTenant.id,
       tenantName: myTenant.fullName,
       roomId: myTenant.roomId,

@@ -1,88 +1,103 @@
-import { Link } from 'react-router-dom';
-import { User, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 const WelcomePage = () => {
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Left Column: Brand & Info */}
-      <div className="w-full md:w-1/2 bg-navy-900 text-white p-8 md:p-16 flex flex-col justify-center">
-        <div className="flex items-center mb-8">
-          <img src="/logo.svg" alt="DwellBase" className="h-12 object-contain" />
-        </div>
-        
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
-          Welcome to DwellBase
-        </h1>
-        <h2 className="text-xl md:text-2xl text-teal-400 font-medium mb-6">
-          Property Management Made Simple.
-        </h2>
-        <p className="text-navy-200 text-lg max-w-md mb-12">
-          Manage your property, tenants, rent, and payments in one simple place.
-        </p>
+  const navigate = useNavigate();
+  const [progress, setProgress] = useState(0);
 
-        {/* Abstract Illustration representation */}
-        <div className="hidden md:flex justify-center items-center opacity-80 mt-auto">
-           <svg width="300" height="200" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="50" y="80" width="200" height="120" rx="4" fill="#1e3a5f" />
-            <polygon points="150,20 270,80 30,80" fill="#2cb1bc" />
-            <rect x="130" y="140" width="40" height="60" fill="#38b2ac" />
-            <rect x="80" y="100" width="30" height="30" fill="#e2e8f0" opacity="0.3" />
-            <rect x="190" y="100" width="30" height="30" fill="#e2e8f0" opacity="0.3" />
-          </svg>
+  useEffect(() => {
+    const duration = 5000; // 5 seconds
+    const intervalTime = 50; // Update every 50ms for smooth 60fps fill
+    const step = (intervalTime / duration) * 100;
+
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        const next = prev + step;
+        if (next >= 100) {
+          clearInterval(timer);
+          navigate('/login');
+          return 100;
+        }
+        return next;
+      });
+    }, intervalTime);
+
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  const handleProceed = () => {
+    navigate('/login');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center px-4 sm:px-6 relative overflow-hidden selection:bg-teal-500 selection:text-white">
+      {/* Ambient background glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Main Centered Content */}
+      <div className="w-full max-w-lg text-center relative z-10 space-y-8 animate-fadeIn">
+        {/* App Logo Display */}
+        <div className="flex flex-col items-center justify-center">
+          <div className="bg-white/95 p-4 sm:p-5 rounded-3xl shadow-2xl border border-white/20 inline-flex items-center justify-center mb-6 backdrop-blur-md hover:scale-105 transition-transform duration-300">
+            <img 
+              src="/logo.svg" 
+              alt="DwellBase Logo" 
+              className="h-12 sm:h-14 object-contain"
+            />
+          </div>
+        </div>
+
+        {/* Text Content Below Logo */}
+        <div className="space-y-3">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center justify-center gap-2">
+            <span>DwellBase</span>
+            <Sparkles className="w-5 h-5 text-teal-400 shrink-0" />
+          </h1>
+          <p className="text-lg sm:text-xl font-medium text-teal-300">
+            Property Management Made Simple.
+          </p>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto leading-relaxed">
+            Welcome to DwellBase. Sign in to access your administrative, landlord, or tenant workspace.
+          </p>
+        </div>
+
+        {/* Button with 5s Left-to-Right Loading Progress */}
+        <div className="pt-2 max-w-xs mx-auto">
+          <button
+            type="button"
+            onClick={handleProceed}
+            className="w-full relative overflow-hidden group py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-teal-500/40 text-white font-bold text-sm shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {/* Animated Loading Bar that fills from left to right over 5 seconds */}
+            <div 
+              className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-teal-500 via-teal-400 to-emerald-400 opacity-90 transition-all duration-75 ease-linear pointer-events-none"
+              style={{ width: `${Math.min(progress, 100)}%` }}
+            />
+
+            {/* Button text overlay */}
+            <span className="relative z-10 flex items-center justify-center gap-2 text-slate-950 font-extrabold drop-shadow-sm">
+              <span>Continue to Sign In</span>
+              <ArrowRight className="w-4 h-4 text-slate-950 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </button>
+
+          {/* Subtext countdown hint */}
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
+            <span>Auto-entering in {Math.max(1, Math.ceil((5000 - (progress / 100) * 5000) / 1000))}s...</span>
+            <button 
+              onClick={handleProceed}
+              className="text-teal-400 hover:underline cursor-pointer"
+            >
+              Skip
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Right Column: Login Options */}
-      <div className="w-full md:w-1/2 flex items-center justify-center p-8 md:p-16 bg-white">
-        <div className="w-full max-w-md">
-          <div className="mb-10 text-center md:text-left">
-            <h2 className="text-3xl font-bold text-slate-800 mb-2">Access Your Account</h2>
-            <p className="text-slate-500">Choose your account type to continue.</p>
-          </div>
-
-          <div className="space-y-6">
-            {/* Admin Login Option */}
-            <Link 
-              to="/admin-login"
-              className="block p-6 rounded-xl border border-gray-200 hover:border-teal-500 hover:shadow-lg transition-all duration-300 group bg-white"
-            >
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-navy-50 rounded-lg group-hover:bg-navy-900 transition-colors">
-                  <ShieldCheck className="w-8 h-8 text-navy-700 group-hover:text-teal-400" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-1 group-hover:text-navy-700">Admin Login</h3>
-                  <p className="text-slate-500 text-sm">For authorized landlords and property managers.</p>
-                </div>
-              </div>
-            </Link>
-
-            {/* Tenant Login Option */}
-            <Link 
-              to="/tenant-login"
-              className="block p-6 rounded-xl border border-gray-200 hover:border-teal-500 hover:shadow-lg transition-all duration-300 group bg-white"
-            >
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-teal-50 rounded-lg group-hover:bg-teal-500 transition-colors">
-                  <User className="w-8 h-8 text-teal-600 group-hover:text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-800 mb-1 group-hover:text-teal-600">Tenant Login</h3>
-                  <p className="text-slate-500 text-sm">For tenants who want to view their rent, bills, and payment history.</p>
-                </div>
-              </div>
-            </Link>
-          </div>
-
-          <div className="mt-10 text-center pt-6 border-t border-gray-100">
-            <Link 
-              to="/superadmin-login" 
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors font-medium"
-            >
-              <span>Platform Governance &bull; Super Admin Portal</span>
-            </Link>
-          </div>
-        </div>
+      {/* Minimal Bottom Notice */}
+      <div className="absolute bottom-6 text-center text-[11px] text-slate-400">
+        DwellBase &bull; Multi-Tenant Property Platform
       </div>
     </div>
   );

@@ -168,7 +168,7 @@ const AdminPayments = () => {
       });
       setIsCashSubmitting(false);
       if ('error' in result) {
-        setCashFormError(result.error);
+        setCashFormError(String((result as { error?: unknown }).error || 'Payment failed'));
         setCashConfirmStep(false);
         return;
       }

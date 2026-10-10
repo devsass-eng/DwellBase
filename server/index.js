@@ -21,9 +21,24 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(helmet());
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map(o => o.trim())
+  : ["http://localhost:5173"];
+
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes("*") || 
+      allowedOrigins.includes(origin) || 
+      origin.endsWith(".netlify.app") || 
+      origin.includes("localhost")
+    ) {
+      return callback(null, true);
+    }
+    callback(null, true); // Allow all web clients in production
+  },
   credentials: true,
 }));
 app.use(express.json());

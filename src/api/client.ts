@@ -1,5 +1,5 @@
 // src/api/client.ts
-// Central API client for DwellBase backend
+// Central API client for DwellBase multi-landlord platform
 
 const BASE_URL = (import.meta as { env: Record<string, string> }).env.VITE_API_URL || "http://localhost:4000";
 
@@ -17,6 +17,7 @@ export function clearToken(): void {
   localStorage.removeItem("dwellbase_token");
   localStorage.removeItem("dwellbase_role");
   localStorage.removeItem("dwellbase_user");
+  localStorage.removeItem("dwellbase_auth");
 }
 
 export function getRole(): string | null {
@@ -54,20 +55,48 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 export interface AuthResponse {
   token: string;
+  role?: string;
   landlord?: Record<string, unknown>;
   tenant?: Record<string, unknown>;
   superAdmin?: Record<string, unknown>;
 }
 
+export interface PublicPlatformSettings {
+  one_time_fee?: string;
+  platform_name?: string;
+  tagline?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  contact_momo_number?: string;
+  contact_momo_name?: string;
+  contact_instructions?: string;
+  [key: string]: string | undefined;
+}
+
 export const auth = {
-  landlordRegister: (body: { fullName: string; email: string; password: string; phone?: string; propertyName?: string }) =>
-    apiFetch<AuthResponse>("/api/auth/landlord/register", { method: "POST", body: JSON.stringify(body) }),
+  getPublicSettings: () => apiFetch<PublicPlatformSettings>("/api/auth/public-settings"),
+  verifyActivationToken: (token: string) =>
+    apiFetch<{
+      valid: boolean;
+      landlord: { id: string; fullName: string; email: string; propertyName: string };
+      expiresAt: string;
+    }>(`/api/auth/verify-activation-token?token=${encodeURIComponent(token)}`),
+  completeActivation: (token: string, password: string) =>
+    apiFetch<{
+      success: boolean;
+      token: string;
+      landlord: Record<string, unknown>;
+      message: string;
+    }>("/api/auth/complete-activation", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
+  superAdminLogin: (email: string, password: string) =>
+    apiFetch<AuthResponse>("/api/auth/superadmin/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   landlordLogin: (email: string, password: string) =>
     apiFetch<AuthResponse>("/api/auth/landlord/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   tenantLogin: (tenantId: string, password: string) =>
     apiFetch<AuthResponse>("/api/auth/tenant/login", { method: "POST", body: JSON.stringify({ tenantId, password }) }),
-  superAdminLogin: (email: string, password: string) =>
-    apiFetch<AuthResponse>("/api/auth/superadmin/login", { method: "POST", body: JSON.stringify({ email, password }) }),
 };
 
 // ─── Rooms ────────────────────────────────────────────────────────────────────
@@ -101,7 +130,7 @@ export const chargesApi = {
     apiFetch<unknown>(`/api/charges/${id}/status`, { method: "PATCH", body: JSON.stringify(updates) }),
 };
 
-// ─── Payments ─────────────────────────────────────────────────────────────────
+// ─── Payments (Tenant to Landlord) ───────────────────────────────────────────
 
 export const paymentsApi = {
   list: () => apiFetch<unknown[]>("/api/payments"),
@@ -147,38 +176,63 @@ export const reportsApi = {
 
 // ─── Super Admin API ─────────────────────────────────────────────────────────
 
+export interface OneTimePaymentRecord {
+  id: string;
+  payment_id: string;
+  landlord_id: string;
+  landlord_name: string;
+  landlord_email: string;
+  landlord_code?: string;
+  landlord_phone?: string;
+  landlord_account_status?: string;
+  amount: number;
+  payment_method: 'cash' | 'direct_momo';
+  date_received: string;
+  external_reference?: string;
+  receipt_number?: string;
+  status: 'pending_verification' | 'approved' | 'rejected' | 'reversed';
+  recorded_by: string;
+  approved_by?: string;
+  approval_date?: string;
+  rejection_reason?: string;
+  reversal_reason?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export interface SuperAdminLandlord {
   id: string;
+  landlord_code?: string;
   full_name: string;
   email: string;
   phone: string;
   property_name: string;
   property_address: string;
-  subscription_plan: 'Starter' | 'Standard' | 'Pro' | 'Enterprise';
-  subscription_duration_months: number;
-  subscription_start_date: string;
-  subscription_end_date: string;
-  account_status: 'Active' | 'Suspended' | 'Expired' | 'Pending Activation';
-  computedStatus?: string;
+  one_time_fee: number;
+  is_paid: boolean;
+  payment_approved_at?: string;
+  account_activated_at?: string;
+  account_status: 'Active' | 'Pending Payment' | 'Pending Activation' | 'Suspended';
+  suspension_reason?: string;
   created_at: string;
   updated_at: string;
   room_count: number;
   tenant_count: number;
-  active_tenant_count: number;
-  total_billed: number;
-  total_paid: number;
+  latest_payment?: OneTimePaymentRecord;
 }
 
 export interface SuperAdminStats {
   totalLandlords: number;
   activeLandlords: number;
-  suspendedLandlords: number;
-  pendingLandlords: number;
-  expiredLandlords: number;
+  pendingPayment: number;
+  pendingActivation: number;
+  suspendedAccounts: number;
+  totalApprovedCollections: number;
   totalRooms: number;
   totalTenants: number;
-  totalCharged: number;
-  totalCollected: number;
+  recentLandlords: SuperAdminLandlord[];
+  recentPayments: OneTimePaymentRecord[];
+  recentAudit: SuperAdminAuditLog[];
 }
 
 export interface SuperAdminAuditLog {
@@ -186,8 +240,8 @@ export interface SuperAdminAuditLog {
   super_admin_id: string;
   super_admin_name: string;
   action: string;
-  landlord_id: string;
-  landlord_name: string;
+  landlord_id?: string;
+  landlord_name?: string;
   details: Record<string, unknown>;
   notes: string;
   ip_address?: string;
@@ -201,22 +255,30 @@ export const superAdminApi = {
     landlord: SuperAdminLandlord;
     rooms: unknown[];
     tenants: unknown[];
-    recentPayments: unknown[];
+    payments: OneTimePaymentRecord[];
     history: SuperAdminAuditLog[];
+    activationTokens: { id: string; raw_token: string; expires_at: string; used_at: string | null; created_at: string }[];
   }>(`/api/superadmin/landlords/${id}`),
   createLandlord: (data: {
     fullName: string;
     email: string;
-    password?: string;
     phone?: string;
     propertyName?: string;
     propertyAddress?: string;
-    subscriptionPlan?: string;
-    subscriptionDurationMonths?: number;
-    subscriptionStartDate?: string;
-    accountStatus?: string;
+    oneTimeFee?: number;
+    paymentReceived?: boolean;
+    paymentMethod?: string;
+    dateReceived?: string;
+    externalReference?: string;
+    receiptNumber?: string;
     notes?: string;
-  }) => apiFetch<{ landlord: SuperAdminLandlord; initialPassword?: string; message: string }>("/api/superadmin/landlords", {
+    autoApprove?: boolean;
+  }) => apiFetch<{
+    landlord: SuperAdminLandlord;
+    payment?: OneTimePaymentRecord;
+    activation?: { token: string; activationLink: string; expiresAt: string };
+    message: string;
+  }>("/api/superadmin/landlords", {
     method: "POST",
     body: JSON.stringify(data),
   }),
@@ -226,7 +288,11 @@ export const superAdminApi = {
       body: JSON.stringify(updates),
     }),
   activateLandlord: (id: string, notes?: string) =>
-    apiFetch<{ landlord: SuperAdminLandlord; message: string }>(`/api/superadmin/landlords/${id}/activate`, {
+    apiFetch<{
+      landlord: SuperAdminLandlord;
+      activation?: { token: string; activationLink: string; expiresAt: string };
+      message: string;
+    }>(`/api/superadmin/landlords/${id}/activate`, {
       method: "POST",
       body: JSON.stringify({ notes }),
     }),
@@ -235,29 +301,58 @@ export const superAdminApi = {
       method: "POST",
       body: JSON.stringify({ reason, notes }),
     }),
-  renewSubscription: (id: string, months: number, notes?: string) =>
-    apiFetch<{ landlord: SuperAdminLandlord; message: string }>(`/api/superadmin/landlords/${id}/renew`, {
+  reactivateLandlord: (id: string, notes?: string) =>
+    apiFetch<{ landlord: SuperAdminLandlord; message: string }>(`/api/superadmin/landlords/${id}/reactivate`, {
       method: "POST",
-      body: JSON.stringify({ months, notes }),
-    }),
-  changePlan: (id: string, plan: string, durationMonths?: number, notes?: string) =>
-    apiFetch<{ landlord: SuperAdminLandlord; message: string }>(`/api/superadmin/landlords/${id}/change-plan`, {
-      method: "POST",
-      body: JSON.stringify({ plan, durationMonths, notes }),
+      body: JSON.stringify({ notes }),
     }),
   resetAccess: (id: string, temporaryPassword?: string, notes?: string) =>
     apiFetch<{
       message: string;
+      activationLink: string;
+      token: string;
       temporaryPassword?: string;
-      resetToken?: string;
-      resetLink?: string;
       expiresAt: string;
     }>(`/api/superadmin/landlords/${id}/reset-access`, {
       method: "POST",
       body: JSON.stringify({ temporaryPassword, notes }),
     }),
-  getLandlordHistory: (id: string) => apiFetch<SuperAdminAuditLog[]>(`/api/superadmin/landlords/${id}/history`),
+  getPayments: () => apiFetch<OneTimePaymentRecord[]>("/api/superadmin/payments"),
+  recordPayment: (data: {
+    landlordId: string;
+    amount: number;
+    paymentMethod: string;
+    dateReceived?: string;
+    externalReference?: string;
+    receiptNumber?: string;
+    notes?: string;
+    autoApprove?: boolean;
+  }) => apiFetch<{ payment: OneTimePaymentRecord; message: string }>("/api/superadmin/payments", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+  approvePayment: (id: string, notes?: string) =>
+    apiFetch<{ payment: OneTimePaymentRecord; landlord: SuperAdminLandlord; message: string }>(`/api/superadmin/payments/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ notes }),
+    }),
+  rejectPayment: (id: string, reason: string, notes?: string) =>
+    apiFetch<{ payment: OneTimePaymentRecord; message: string }>(`/api/superadmin/payments/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason, notes }),
+    }),
+  reversePayment: (id: string, reason: string, notes?: string) =>
+    apiFetch<{ payment: OneTimePaymentRecord; message: string }>(`/api/superadmin/payments/${id}/reverse`, {
+      method: "POST",
+      body: JSON.stringify({ reason, notes }),
+    }),
   getAuditLogs: () => apiFetch<SuperAdminAuditLog[]>("/api/superadmin/audit-logs"),
+  getSettings: () => apiFetch<PublicPlatformSettings>("/api/superadmin/settings"),
+  updateSettings: (updates: Record<string, string>) =>
+    apiFetch<{ settings: PublicPlatformSettings; message: string }>("/api/superadmin/settings", {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
 };
 
 // ─── Health ───────────────────────────────────────────────────────────────────
@@ -265,4 +360,3 @@ export const superAdminApi = {
 export const healthApi = {
   check: () => apiFetch<{ status: string; time: string }>("/api/health"),
 };
-

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ShieldCheck, Search, Filter, Calendar, Activity, Loader2, User } from 'lucide-react';
+import { ShieldCheck, Search, Filter, Activity, Loader2 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
-import { superAdminApi, SuperAdminAuditLog } from '../api/client';
+import { superAdminApi } from '../api/client';
+import type { SuperAdminAuditLog } from '../api/client';
 
 const SuperAdminAuditLogs = () => {
   const [logs, setLogs] = useState<SuperAdminAuditLog[]>([]);
@@ -26,10 +27,10 @@ const SuperAdminAuditLogs = () => {
 
   const filteredLogs = logs.filter((l) => {
     const matchesSearch =
-      l.landlord_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.super_admin_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (l.landlord_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (l.super_admin_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (l.notes && l.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      l.action.toLowerCase().includes(searchTerm.toLowerCase());
+      (l.action || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesAction = actionFilter === 'ALL' || l.action === actionFilter;
     return matchesSearch && matchesAction;
@@ -39,18 +40,26 @@ const SuperAdminAuditLogs = () => {
     switch (action) {
       case 'CREATE_LANDLORD':
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">CREATE_LANDLORD</span>;
+      case 'APPROVE_PAYMENT':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">APPROVE_PAYMENT</span>;
+      case 'RECORD_PAYMENT':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">RECORD_PAYMENT</span>;
+      case 'REJECT_PAYMENT':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">REJECT_PAYMENT</span>;
+      case 'REVERSE_PAYMENT':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">REVERSE_PAYMENT</span>;
       case 'ACTIVATE_ACCOUNT':
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">ACTIVATE_ACCOUNT</span>;
       case 'SUSPEND_ACCOUNT':
-        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">SUSPEND_ACCOUNT</span>;
-      case 'RENEW_SUBSCRIPTION':
-        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">RENEW_SUBSCRIPTION</span>;
-      case 'CHANGE_PLAN':
-        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">CHANGE_PLAN</span>;
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">SUSPEND_ACCOUNT</span>;
+      case 'REACTIVATE_ACCOUNT':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">REACTIVATE_ACCOUNT</span>;
       case 'RESET_ACCESS':
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">RESET_ACCESS</span>;
       case 'EDIT_LANDLORD':
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">EDIT_LANDLORD</span>;
+      case 'UPDATE_SETTINGS':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">UPDATE_SETTINGS</span>;
       default:
         return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-100 text-gray-700">{action}</span>;
     }
@@ -61,13 +70,13 @@ const SuperAdminAuditLogs = () => {
       <div className="space-y-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-slate-900 text-amber-400 rounded-lg">
+            <div className="p-2 bg-navy-900 text-teal-400 rounded-xl shadow-sm">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Platform Audit Logs</h1>
           </div>
           <p className="text-slate-500 text-sm mt-1">
-            Immutable system record of all administrative operations, activations, suspensions, renewals, and credentials resets.
+            Immutable system audit trail of all landlord account operations, one-time payment approvals, suspensions, reactivations, and credential resets.
           </p>
         </div>
 
@@ -80,7 +89,7 @@ const SuperAdminAuditLogs = () => {
               placeholder="Search audit trail by actor, landlord name, action, or memo..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-navy-900"
             />
           </div>
 
@@ -90,16 +99,20 @@ const SuperAdminAuditLogs = () => {
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs focus:outline-none"
             >
               <option value="ALL">All Actions</option>
               <option value="CREATE_LANDLORD">CREATE_LANDLORD</option>
+              <option value="APPROVE_PAYMENT">APPROVE_PAYMENT</option>
+              <option value="RECORD_PAYMENT">RECORD_PAYMENT</option>
+              <option value="REJECT_PAYMENT">REJECT_PAYMENT</option>
+              <option value="REVERSE_PAYMENT">REVERSE_PAYMENT</option>
               <option value="ACTIVATE_ACCOUNT">ACTIVATE_ACCOUNT</option>
               <option value="SUSPEND_ACCOUNT">SUSPEND_ACCOUNT</option>
-              <option value="RENEW_SUBSCRIPTION">RENEW_SUBSCRIPTION</option>
-              <option value="CHANGE_PLAN">CHANGE_PLAN</option>
+              <option value="REACTIVATE_ACCOUNT">REACTIVATE_ACCOUNT</option>
               <option value="RESET_ACCESS">RESET_ACCESS</option>
               <option value="EDIT_LANDLORD">EDIT_LANDLORD</option>
+              <option value="UPDATE_SETTINGS">UPDATE_SETTINGS</option>
             </select>
           </div>
         </div>
@@ -120,9 +133,9 @@ const SuperAdminAuditLogs = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-slate-50/75 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                  <tr className="bg-slate-50/80 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
                     <th className="py-3 px-4">Action</th>
-                    <th className="py-3 px-4">Landlord</th>
+                    <th className="py-3 px-4">Subject / Landlord</th>
                     <th className="py-3 px-4">Administrative Memo / Details</th>
                     <th className="py-3 px-4">Super Admin Actor</th>
                     <th className="py-3 px-4">Timestamp</th>
@@ -132,7 +145,9 @@ const SuperAdminAuditLogs = () => {
                   {filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3.5 px-4">{getActionBadge(log.action)}</td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-800">{log.landlord_name}</td>
+                      <td className="py-3.5 px-4 font-semibold text-slate-800">
+                        {log.landlord_name || 'System'}
+                      </td>
                       <td className="py-3.5 px-4 text-slate-600 max-w-xs">{log.notes || 'Administrative action performed'}</td>
                       <td className="py-3.5 px-4 font-medium text-slate-700">{log.super_admin_name}</td>
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>

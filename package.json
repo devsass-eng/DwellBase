@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "node server/migrate.js && node server/index.js",
     "server": "node --watch server/index.js",
     "migrate": "node server/migrate.js",
     "build": "tsc -b && vite build",

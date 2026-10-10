@@ -1,17 +1,26 @@
-﻿services:
+services:
   - type: web
     name: dwellbase-api
     env: node
     region: oregon
     plan: free
     buildCommand: npm install
-    startCommand: node server/index.js
+    startCommand: node server/migrate.js && node server/index.js
     envVars:
       - key: DATABASE_URL
-        sync: false   # Set manually in Render dashboard
+        fromDatabase:
+          name: dwellbase-db
+          property: connectionString
       - key: JWT_SECRET
-        sync: false   # Set manually in Render dashboard
-      - key: FRONTEND_URL
-        sync: false   # Set to your Netlify URL after deploying
+        generateValue: true
       - key: NODE_ENV
         value: production
+      - key: FRONTEND_URL
+        value: "*"
+
+databases:
+  - name: dwellbase-db
+    databaseName: dwellbase
+    user: dwellbase_user
+    plan: free
+    region: oregon

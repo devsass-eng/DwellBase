@@ -5,7 +5,8 @@ import {
   LayoutDashboard, Users, DoorOpen, 
   CreditCard, FileText, Settings, LogOut, 
   Menu, X, Bell, Cloud, User as UserIcon, CheckCheck,
-  ClipboardList, Building2, ShieldCheck
+  ClipboardList, Building2, ShieldCheck, UserPlus, 
+  History, CheckCircle2
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -40,10 +41,14 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
   }).slice(0, 20);
 
   const superAdminNav: NavItem[] = [
-    { name: 'Dashboard', path: '/superadmin/dashboard', icon: LayoutDashboard },
+    { name: 'Overview', path: '/superadmin/dashboard', icon: LayoutDashboard },
     { name: 'Landlords', path: '/superadmin/landlords', icon: Building2 },
+    { name: 'Add Landlord', path: '/superadmin/add-landlord', icon: UserPlus },
+    { name: 'One-Time Payments', path: '/superadmin/payments', icon: CreditCard },
+    { name: 'Payment History', path: '/superadmin/payment-history', icon: History },
+    { name: 'Account Status', path: '/superadmin/account-status', icon: CheckCircle2 },
     { name: 'Audit Logs', path: '/superadmin/audit-logs', icon: ShieldCheck },
-    { name: 'Settings', path: '/superadmin/settings', icon: Settings },
+    { name: 'Platform Settings', path: '/superadmin/settings', icon: Settings },
   ];
 
   const landlordNav: NavItem[] = [
