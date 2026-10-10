@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -12,6 +12,7 @@ import paymentRoutes from "./routes/payments.js";
 import regulationRoutes from "./routes/regulations.js";
 import settingsRoutes from "./routes/settings.js";
 import reportsRoutes from "./routes/reports.js";
+import seedRoutes from "./routes/seed.js";
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/regulations", regulationRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/reports", reportsRoutes);
+app.use("/api/seed", seedRoutes);
 
 // ─── Global error handler ────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, User, ArrowLeft, Loader2 } from 'lucide-react';
+import { auth, setToken } from '../api/client';
 
 const TenantLogin = () => {
   const [identifier, setIdentifier] = useState('');
@@ -10,29 +11,34 @@ const TenantLogin = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!identifier || !password) {
-      setError('Please enter your Tenant ID or email and password.');
+      setError('Please enter your Tenant ID and password.');
       return;
     }
-    
+
     setLoading(true);
-    
-    // Simulate authentication
-    setTimeout(() => {
-      setLoading(false);
-      if (identifier === 'kofi.boateng@dwellbase.demo' || identifier === 'TENT-00') {
-         setError('Your tenant login access has been revoked. All historical tenancy and financial records remain preserved with property management.');
-      } else if ((identifier === 'tenant@dwellbase.com' || identifier === 'TENT-01') && password === 'password') {
-         localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'tenant', identifier, name: 'Kwesi Mensah', tenantId: 'tenant-1' }));
-         navigate('/tenant/dashboard');
+    try {
+      const res = await auth.tenantLogin(identifier.trim().toUpperCase(), password);
+      setToken(res.token);
+      localStorage.setItem('dwellbase_role', 'tenant');
+      localStorage.setItem('dwellbase_user', JSON.stringify(res.tenant));
+      // Keep legacy key for ProtectedRoute compatibility
+      localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'tenant', identifier: identifier.trim() }));
+      navigate('/tenant/dashboard');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login failed';
+      if (msg.includes('revoked') || msg.includes('Suspended')) {
+        setError('Your tenant login access has been revoked. All historical tenancy and financial records remain preserved with property management.');
       } else {
-         setError('Invalid credentials. (Hint: use tenant@dwellbase.com / password)');
+        setError(msg);
       }
-    }, 600);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,11 +84,11 @@ const TenantLogin = () => {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tenant ID or Email</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Tenant ID</label>
               <input 
                 type="text" 
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors outline-none"
-                placeholder="tenant@example.com"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors outline-none uppercase"
+                placeholder="e.g. TENT-01"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
               />

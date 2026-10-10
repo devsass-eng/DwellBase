@@ -2,17 +2,18 @@ import { useState } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppData } from '../context/AppDataContext';
 import { useNotifications } from '../context/NotificationContext';
-import { ClipboardList, Plus, AlertCircle } from 'lucide-react';
+import { ClipboardList, Plus, AlertCircle, Trash2 } from 'lucide-react';
 
 const AdminRegulations = () => {
-  const { regulations, addRegulation, tenants } = useAppData();
+  const { regulations, addRegulation, deleteRegulation, tenants } = useAppData();
   const { notify } = useNotifications();
 
   const [inputText, setInputText] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -23,21 +24,15 @@ const AdminRegulations = () => {
     }
 
     setIsSubmitting(true);
-
-    // Simulate network delay
-    setTimeout(() => {
-      addRegulation(text);
+    try {
+      await addRegulation(text);
       setInputText('');
-      setIsSubmitting(false);
-
       notify({
         recipientType: 'landlord',
         title: 'Regulation Added',
         message: 'The new regulation was saved successfully.',
         type: 'success',
       });
-
-      // Notify all active tenants
       const activeTenants = tenants.filter(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming');
       activeTenants.forEach(tenant => {
         notify({
@@ -46,9 +41,24 @@ const AdminRegulations = () => {
           title: 'New Regulation Added',
           message: 'New regulation added. Please visit the Regulations page to read it.',
           type: 'info',
-        }, true); // The true flag ensures pop-ups are created
+        }, true);
       });
-    }, 600);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save regulation.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteRegulation(id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -107,16 +117,24 @@ const AdminRegulations = () => {
               </div>
             ) : (
               regulations.map((reg, index) => (
-                <div key={reg.id} className="p-5 flex gap-4">
+                <div key={reg.id} className="p-5 flex gap-4 items-start">
                   <div className="shrink-0 w-8 h-8 rounded-full bg-navy-50 text-navy-600 flex items-center justify-center font-bold text-sm">
                     {regulations.length - index}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-slate-700 whitespace-pre-wrap">{reg.text}</p>
                     <p className="text-xs text-slate-400 mt-2">
                       Added on {new Date(reg.createdAt).toLocaleDateString()}
                     </p>
                   </div>
+                  <button
+                    onClick={() => handleDelete(reg.id)}
+                    disabled={deletingId === reg.id}
+                    className="shrink-0 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Delete regulation"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))
             )}
