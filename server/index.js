@@ -68,8 +68,8 @@ app.use("/api/seed", seedRoutes);
 app.use("/api/superadmin", superadminRoutes);
 
 // ─── SPA Fallback for client-side routing ─────────────────────────────────────
-app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api")) return next();
+app.use((req, res, next) => {
+  if (req.method !== "GET" || req.path.startsWith("/api")) return next();
   res.sendFile(path.join(distPath, "index.html"), (err) => {
     if (err) next();
   });
