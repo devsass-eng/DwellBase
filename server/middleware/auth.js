@@ -32,7 +32,7 @@ export function requireLandlord(req, res, next) {
     }
     try {
       const result = await pool.query(
-        "SELECT account_status, subscription_end_date FROM landlords WHERE id = $1",
+        "SELECT account_status FROM landlords WHERE id = $1",
         [req.user.landlordId]
       );
       if (result.rows.length === 0) {
