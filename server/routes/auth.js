@@ -258,34 +258,56 @@ router.post("/landlord/login", async (req, res) => {
 router.post("/tenant/login", async (req, res) => {
   const { tenantId, password } = req.body;
   if (!tenantId || !password) {
-    return res.status(400).json({ error: "Tenant ID and password are required" });
+    return res.status(400).json({ error: "Tenant ID, phone, or email and password are required" });
   }
   try {
+    const rawId = tenantId.trim();
+    const cleanPassword = password.trim();
+
+    // Support logging in via Tenant ID, phone, email, or full name
     const result = await pool.query(
-      "SELECT * FROM tenants WHERE tenant_id = $1",
-      [tenantId.trim().toUpperCase()]
+      `SELECT * FROM tenants 
+       WHERE UPPER(tenant_id) = UPPER($1) 
+          OR phone = $1 
+          OR (email IS NOT NULL AND email != '' AND LOWER(email) = LOWER($1))
+          OR LOWER(full_name) = LOWER($1)`,
+      [rawId]
     );
+
     if (result.rows.length === 0) {
       return res.status(401).json({ error: "Invalid Tenant ID or password" });
     }
-    const tenant = result.rows[0];
-    if (!tenant.password_hash) {
-      return res.status(401).json({ error: "Tenant account not activated yet. Please request access from your landlord." });
+
+    let matchedTenant = null;
+    for (const tenant of result.rows) {
+      if (tenant.password_hash) {
+        const match = await bcrypt.compare(cleanPassword, tenant.password_hash)
+                   || await bcrypt.compare(password, tenant.password_hash);
+        if (match) {
+          matchedTenant = tenant;
+          break;
+        }
+      }
     }
-    const match = await bcrypt.compare(password, tenant.password_hash);
-    if (!match) {
+
+    if (!matchedTenant) {
+      const unactivated = result.rows.find(t => !t.password_hash);
+      if (unactivated) {
+        return res.status(401).json({ error: "Tenant login credentials have not been generated yet. Please contact your landlord." });
+      }
       return res.status(401).json({ error: "Invalid Tenant ID or password" });
     }
-    if (tenant.account_status === "Suspended") {
+
+    if (matchedTenant.account_status === "Suspended") {
       return res.status(403).json({ error: "Your tenant login access has been suspended by your landlord." });
     }
 
     const token = jwt.sign(
-      { id: tenant.id, role: "tenant", landlordId: tenant.landlord_id, tenantDbId: tenant.id },
+      { id: matchedTenant.id, role: "tenant", landlordId: matchedTenant.landlord_id, tenantDbId: matchedTenant.id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    const { password_hash, ...safe } = tenant;
+    const { password_hash, ...safe } = matchedTenant;
     res.json({ token, tenant: safe });
   } catch (err) {
     console.error(err);

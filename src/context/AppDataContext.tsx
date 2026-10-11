@@ -420,6 +420,36 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
     const role = getRole();
     if (!isAuthenticated() || role === "super_admin") { setLoading(false); return; }
     try {
+      if (role === "tenant") {
+        const [meRaw, catsRaw, chargesRaw, paymentsRaw, regsRaw, settingsRaw] = await Promise.all([
+          tenantsApi.me().catch(() => null),
+          settingsApi.getCategories().catch(() => []),
+          chargesApi.list().catch(() => []),
+          paymentsApi.list().catch(() => []),
+          regulationsApi.list().catch(() => []),
+          settingsApi.get().catch(() => null),
+        ]);
+        if (meRaw) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setTenants([mapTenant(meRaw as any)]);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCategories((catsRaw as any[]).map(mapCategory));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCharges((chargesRaw as any[]).map(mapCharge));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setPayments((paymentsRaw as any[]).map(mapPayment));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setRegulations((regsRaw as any[]).map(mapRegulation));
+        if (settingsRaw) {
+          const { profile, paymentSettings, notifPrefs } = mapSettings(settingsRaw);
+          setLandlordProfile(profile);
+          setLandlordPaymentSettings(paymentSettings);
+          setLandlordNotificationPrefs(notifPrefs);
+        }
+        return;
+      }
+
       const [roomsRaw, tenantsRaw, catsRaw, chargesRaw, paymentsRaw, regsRaw] = await Promise.all([
         roomsApi.list().catch(() => []),
         tenantsApi.list().catch(() => []),

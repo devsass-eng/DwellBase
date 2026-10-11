@@ -164,4 +164,42 @@ router.patch("/:id", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/tenants/:id/reset-password (landlord resets tenant password)
+router.post("/:id/reset-password", requireLandlord, async (req, res) => {
+  try {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let tempPassword = "";
+    for (let i = 0; i < 8; i++) {
+      tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const { rows } = await pool.query(
+      `UPDATE tenants 
+       SET password_hash = $1, account_status = 'Active', updated_at = NOW() 
+       WHERE id = $2 AND landlord_id = $3 
+       RETURNING *`,
+      [passwordHash, req.params.id, req.user.landlordId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    const { password_hash: _ph, ...safe } = rows[0];
+    res.json({
+      ...safe,
+      temporaryPassword: tempPassword,
+      loginCredentials: {
+        tenantId: safe.tenant_id,
+        temporaryPassword: tempPassword,
+        message: "Password reset successfully. Share this temporary password with the tenant."
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to reset tenant password" });
+  }
+});
+
 export default router;

@@ -80,7 +80,7 @@ const UnifiedLogin = () => {
         }
       } else {
         // Tenant Login
-        const res = await auth.tenantLogin(trimmedId.toUpperCase(), password);
+        const res = await auth.tenantLogin(trimmedId, password.trim());
         setSession('tenant', res.token, res.tenant, { role: 'tenant', identifier: trimmedId });
         navigate('/tenant/dashboard');
       }
@@ -172,7 +172,7 @@ const UnifiedLogin = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              {activeTab === 'tenant' ? 'Tenant ID or Phone Number' : 'Email Address'}
+              {activeTab === 'tenant' ? 'Tenant ID, Phone Number, or Email' : 'Email Address'}
             </label>
             <div className="relative">
               {activeTab === 'tenant' ? (
@@ -188,7 +188,7 @@ const UnifiedLogin = () => {
                     ? 'superadmin@dwellbase.com'
                     : activeTab === 'landlord'
                     ? 'admin@dwellbase.com'
-                    : 'e.g. 0241234567 or Kwesi Mensah'
+                    : 'e.g. TENT-01 or 0241234567'
                 }
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}

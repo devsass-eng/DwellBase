@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppData } from '../context/AppDataContext';
 import type { Tenant } from '../context/AppDataContext';
+import { tenantsApi } from '../api/client';
 import { formatGHS, formatReadableDate } from '../utils/reportUtils';
 import { 
   Plus, Search, Filter, 
@@ -28,6 +29,27 @@ const TenantsManagement = () => {
   const [showCredentials, setShowCredentials] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ tenantId: string; temporaryPassword: string; fullName: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+
+  const handleResetPassword = async (tenant: Tenant) => {
+    try {
+      setResettingId(tenant.id);
+      const res = await tenantsApi.resetPassword(tenant.id);
+      const tempPass = res.loginCredentials?.temporaryPassword || res.temporaryPassword;
+      const tId = res.loginCredentials?.tenantId || tenant.tenantId;
+      setCreatedCredentials({
+        tenantId: tId,
+        temporaryPassword: tempPass,
+        fullName: tenant.fullName
+      });
+      setShowCredentials(true);
+      updateTenant(tenant.id, { accountStatus: 'Active' });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to reset password');
+    } finally {
+      setResettingId(null);
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -298,6 +320,14 @@ const TenantsManagement = () => {
                           <Eye className="w-3.5 h-3.5" /> Details
                         </button>
                         <button 
+                          onClick={() => handleResetPassword(tenant)}
+                          disabled={resettingId === tenant.id}
+                          className="px-2.5 py-1 text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                          title="Generate / Reset Temporary Password"
+                        >
+                          <Key className="w-3.5 h-3.5" /> {resettingId === tenant.id ? 'Resetting...' : 'Password'}
+                        </button>
+                        <button 
                           onClick={() => {
                             setEditingTenant(tenant);
                             setEditForm({
@@ -358,6 +388,18 @@ const TenantsManagement = () => {
                 <div><span className="text-xs text-slate-400 block">Agreed Monthly Rent</span><strong>{formatGHS(viewingTenant.monthlyRent)}</strong></div>
                 <div><span className="text-xs text-slate-400 block">Tenancy Status</span><span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadge(viewingTenant.tenancyStatus)}`}>{viewingTenant.tenancyStatus}</span></div>
                 <div><span className="text-xs text-slate-400 block">Login Account</span><span className="font-semibold text-teal-700">{viewingTenant.accountStatus}</span></div>
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => {
+                      const t = viewingTenant;
+                      setViewingTenant(null);
+                      handleResetPassword(t);
+                    }}
+                    className="px-3.5 py-2 bg-teal-600 text-white rounded-xl text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <Key className="w-3.5 h-3.5" /> Reset Temporary Password
+                  </button>
+                </div>
               </div>
               <div className="flex justify-end pt-3 border-t">
                 <button onClick={() => setViewingTenant(null)} className="px-4 py-2 bg-navy-900 text-white rounded-xl text-xs font-semibold">Close</button>

@@ -250,6 +250,11 @@ export const tenantsApi = {
     apiFetch<unknown>("/api/tenants", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, updates: Record<string, unknown>) =>
     apiFetch<unknown>(`/api/tenants/${id}`, { method: "PATCH", body: JSON.stringify(updates) }),
+  resetPassword: (id: string) =>
+    apiFetch<{
+      temporaryPassword: string;
+      loginCredentials: { tenantId: string; temporaryPassword: string; message: string };
+    }>(`/api/tenants/${id}/reset-password`, { method: "POST" }),
 };
 
 // ─── Charges ─────────────────────────────────────────────────────────────────
