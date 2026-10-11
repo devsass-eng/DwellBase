@@ -50,7 +50,7 @@ const StatusBadge = ({ status }: { status: Room['status'] }) => {
 // ─── Main Component ─────────────────────────────────────────────────────────────
 
 const RoomsManagement = () => {
-  const { rooms, tenants, nextRoomSequence, addRoom, updateRoom, archiveRoom } = useAppData();
+  const { rooms, tenants, nextRoomSequence, addRoom, updateRoom, archiveRoom, landlordProfile } = useAppData();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | Room['status']>('All');
@@ -108,7 +108,7 @@ const RoomsManagement = () => {
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleAddRoom = (e: React.FormEvent) => {
+  const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddFormError('');
     const rent = parseFloat(rentInput);
@@ -116,13 +116,15 @@ const RoomsManagement = () => {
       return setAddFormError('Please enter a valid monthly rent amount greater than GH₵0.');
     }
     setIsSubmitting(true);
-    // Simulate async save
-    setTimeout(() => {
-      addRoom(rent);
+    try {
+      await addRoom(rent);
       setRentInput('');
-      setIsSubmitting(false);
       setIsAddModalOpen(false);
-    }, 600);
+    } catch (err) {
+      setAddFormError(err instanceof Error ? err.message : 'Failed to add room');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openDetail = (room: Room) => {
@@ -137,7 +139,7 @@ const RoomsManagement = () => {
     setIsEditRentModalOpen(true);
   };
 
-  const handleEditRent = (e: React.FormEvent) => {
+  const handleEditRent = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditRentError('');
     if (!selectedRoom) return;
@@ -146,25 +148,36 @@ const RoomsManagement = () => {
       return setEditRentError('Rent must be greater than GH₵0.');
     }
     setIsEditSubmitting(true);
-    setTimeout(() => {
-      updateRoom(selectedRoom.id, { monthlyRent: rent });
-      setIsEditSubmitting(false);
+    try {
+      await updateRoom(selectedRoom.id, { monthlyRent: rent });
       setIsEditRentModalOpen(false);
       setSelectedRoom(null);
-    }, 500);
+    } catch (err) {
+      setEditRentError(err instanceof Error ? err.message : 'Failed to update rent');
+    } finally {
+      setIsEditSubmitting(false);
+    }
   };
 
-  const handleToggleMaintenance = (room: Room) => {
+  const handleToggleMaintenance = async (room: Room) => {
     if (room.status === 'Occupied') return; // guarded
     const newStatus: Room['status'] = room.status === 'Maintenance' ? 'Vacant' : 'Maintenance';
-    updateRoom(room.id, { status: newStatus });
+    try {
+      await updateRoom(room.id, { status: newStatus });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update room status');
+    }
   };
 
-  const handleArchive = (room: Room) => {
+  const handleArchive = async (room: Room) => {
     if (!confirm(`Archive ${room.roomNumber}? This cannot be undone.`)) return;
-    const success = archiveRoom(room.id);
-    if (!success) {
-      alert(`Cannot archive ${room.roomNumber} — it still has an active tenant.`);
+    try {
+      const success = await archiveRoom(room.id);
+      if (!success) {
+        alert(`Cannot archive ${room.roomNumber} — it still has an active tenant.`);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to archive room');
     }
   };
 
@@ -174,7 +187,7 @@ const RoomsManagement = () => {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <DashboardLayout userType="landlord" userName="Sarah Landlord">
+    <DashboardLayout userType="landlord" userName={landlordProfile?.fullName || 'Landlord'}>
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ── Page Header ── */}
