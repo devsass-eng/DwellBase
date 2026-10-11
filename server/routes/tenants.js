@@ -48,11 +48,11 @@ router.post("/", requireLandlord, async (req, res) => {
     return res.status(400).json({ error: "fullName and tenantId are required" });
   }
   try {
-    // Determine if we should create login credentials immediately
-    const shouldCreateLogin = createLogin === "now";
+    // Always generate tenant account and temporary password by default
+    const shouldCreateLogin = createLogin !== "no" && createLogin !== false;
     let tempPassword = null;
     let passwordHash = null;
-    let finalAccountStatus = accountStatus || "Not Set Up";
+    let finalAccountStatus = "Active";
 
     if (shouldCreateLogin) {
       // Generate a random 8-character temporary password

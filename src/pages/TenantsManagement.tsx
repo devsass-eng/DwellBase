@@ -37,8 +37,7 @@ const TenantsManagement = () => {
     roomId: '',
     startDate: new Date().toISOString().split('T')[0],
     durationMonths: '12',
-    customDuration: '',
-    createLogin: 'later'
+    customDuration: ''
   });
 
   const [formError, setFormError] = useState('');
@@ -89,7 +88,7 @@ const TenantsManagement = () => {
     setFormData({
       fullName: '', phone: '', email: '', roomId: '',
       startDate: new Date().toISOString().split('T')[0],
-      durationMonths: '12', customDuration: '', createLogin: 'later'
+      durationMonths: '12', customDuration: ''
     });
     setFormError('');
   };
@@ -131,17 +130,20 @@ const TenantsManagement = () => {
         amountPaid: 0,
         outstandingBalance: 0,
         tenancyStatus: new Date(formData.startDate) > new Date() ? 'Upcoming' : 'Active',
-        accountStatus: formData.createLogin === 'now' ? 'Active' : 'Not Set Up',
-        createLogin: formData.createLogin
+        accountStatus: 'Active',
+        createLogin: 'now'
       });
 
       setIsAddModalOpen(false);
 
-      // If credentials were generated, show them
-      if (result?.loginCredentials) {
+      // Credentials are generated automatically for every tenant
+      const tempPassword = result?.loginCredentials?.temporaryPassword || result?.temporaryPassword;
+      const tenantLoginId = result?.loginCredentials?.tenantId || result?.tenantId || generatedTenantId;
+
+      if (tempPassword) {
         setCreatedCredentials({
-          tenantId: result.loginCredentials.tenantId,
-          temporaryPassword: result.loginCredentials.temporaryPassword,
+          tenantId: tenantLoginId,
+          temporaryPassword: tempPassword,
           fullName: formData.fullName
         });
         setShowCredentials(true);
@@ -585,40 +587,20 @@ const TenantsManagement = () => {
                     )}
                   </section>
 
-                  {/* Section C: Login Access */}
+                  {/* Section C: Automatic Login Access */}
                   <section>
-                    <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                      3. Tenant Login Access
+                    <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100 flex items-center gap-2">
+                      <Key className="w-3.5 h-3.5 text-teal-600" />
+                      <span>3. Tenant Portal Access</span>
                     </h4>
-                    <div className="space-y-3">
-                      <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 cursor-pointer transition-colors">
-                        <input
-                          type="radio"
-                          name="createLogin"
-                          value="now"
-                          checked={formData.createLogin === 'now'}
-                          onChange={() => setFormData({ ...formData, createLogin: 'now' })}
-                          className="mt-0.5 accent-teal-600"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-slate-800">Create login now</span>
-                          <p className="text-xs text-slate-500 mt-0.5">A temporary password will be generated. Share it with the tenant so they can log in to their portal.</p>
-                        </div>
-                      </label>
-                      <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 cursor-pointer transition-colors">
-                        <input
-                          type="radio"
-                          name="createLogin"
-                          value="later"
-                          checked={formData.createLogin === 'later'}
-                          onChange={() => setFormData({ ...formData, createLogin: 'later' })}
-                          className="mt-0.5 accent-teal-600"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-slate-800">Set up later</span>
-                          <p className="text-xs text-slate-500 mt-0.5">The tenant record will be created without login access. You can set it up anytime from the tenant details.</p>
-                        </div>
-                      </label>
+                    <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200/80 flex items-start gap-3">
+                      <ShieldCheck className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                      <div className="text-xs text-teal-900 leading-relaxed">
+                        <strong className="block font-semibold mb-0.5 text-teal-950">
+                          Automatic Account & Password Generation
+                        </strong>
+                        A tenant portal account is automatically created. You will receive the Tenant Login ID and a temporary password immediately upon saving to share with the tenant.
+                      </div>
                     </div>
                   </section>
                 </form>
