@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, Loader2, ArrowRight } from 'lucide-react';
-import { auth, setToken } from '../api/client';
+import { auth, setSession } from '../api/client';
 
 const LandlordActivation = () => {
   const [searchParams] = useSearchParams();
@@ -53,10 +53,7 @@ const LandlordActivation = () => {
     setSubmitting(true);
     try {
       const res = await auth.completeActivation(token, password);
-      setToken(res.token);
-      localStorage.setItem('dwellbase_role', 'landlord');
-      localStorage.setItem('dwellbase_user', JSON.stringify(res.landlord));
-      localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'landlord', email: res.landlord?.email }));
+      setSession('landlord', res.token, res.landlord, { role: 'landlord', email: res.landlord?.email });
 
       setActivatedSuccess(true);
       setTimeout(() => {

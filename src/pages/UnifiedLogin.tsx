@@ -1,22 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   ShieldCheck, Building2, User, Eye, EyeOff, 
   ArrowLeft, Loader2, Lock, Mail
 } from 'lucide-react';
-import { auth, setToken } from '../api/client';
+import { auth, setSession } from '../api/client';
 
 type RoleTab = 'admin' | 'landlord' | 'tenant';
 
 const UnifiedLogin = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  // Role tab state: Admin, Landlord, Tenant
-  const initialRole = (searchParams.get('role') as RoleTab) || 'admin';
-  const [activeTab, setActiveTab] = useState<RoleTab>(
-    ['admin', 'landlord', 'tenant'].includes(initialRole) ? initialRole : 'admin'
-  );
+  const getInitialTab = (): RoleTab => {
+    if (location.pathname === '/superadmin-login') return 'admin';
+    if (location.pathname === '/admin-login') return 'landlord';
+    if (location.pathname === '/tenant-login') return 'tenant';
+    const roleParam = searchParams.get('role') as RoleTab;
+    if (roleParam && ['admin', 'landlord', 'tenant'].includes(roleParam)) {
+      return roleParam;
+    }
+    return 'admin';
+  };
+
+  const [activeTab, setActiveTab] = useState<RoleTab>(getInitialTab());
 
   // Form states
   const [identifier, setIdentifier] = useState('');
@@ -34,12 +42,12 @@ const UnifiedLogin = () => {
   };
 
   useEffect(() => {
-    const roleParam = searchParams.get('role') as RoleTab;
-    if (roleParam && ['admin', 'landlord', 'tenant'].includes(roleParam) && roleParam !== activeTab) {
-      setActiveTab(roleParam);
+    const tab = getInitialTab();
+    if (tab !== activeTab) {
+      setActiveTab(tab);
       setError('');
     }
-  }, [searchParams]);
+  }, [location.pathname, searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,35 +64,24 @@ const UnifiedLogin = () => {
       if (activeTab === 'admin') {
         // Super Admin (Admin) Login
         const res = await auth.superAdminLogin(trimmedId.toLowerCase(), password);
-        setToken(res.token);
-        localStorage.setItem('dwellbase_role', 'super_admin');
-        localStorage.setItem('dwellbase_user', JSON.stringify(res.superAdmin));
-        localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'super_admin', email: trimmedId }));
+        setSession('super_admin', res.token, res.superAdmin, { role: 'super_admin', email: trimmedId });
         navigate('/superadmin/dashboard');
       } else if (activeTab === 'landlord') {
         // Landlord Login
         const res = await auth.landlordLogin(trimmedId.toLowerCase(), password);
-        setToken(res.token);
         
         // If the user entered admin credentials while on landlord tab, seamlessly route them
         if (res.role === 'super_admin' || res.superAdmin) {
-          localStorage.setItem('dwellbase_role', 'super_admin');
-          localStorage.setItem('dwellbase_user', JSON.stringify(res.superAdmin));
-          localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'super_admin', email: trimmedId }));
+          setSession('super_admin', res.token, res.superAdmin, { role: 'super_admin', email: trimmedId });
           navigate('/superadmin/dashboard');
         } else {
-          localStorage.setItem('dwellbase_role', 'landlord');
-          localStorage.setItem('dwellbase_user', JSON.stringify(res.landlord));
-          localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'landlord', email: trimmedId }));
+          setSession('landlord', res.token, res.landlord, { role: 'landlord', email: trimmedId });
           navigate('/landlord/dashboard');
         }
       } else {
         // Tenant Login
         const res = await auth.tenantLogin(trimmedId.toUpperCase(), password);
-        setToken(res.token);
-        localStorage.setItem('dwellbase_role', 'tenant');
-        localStorage.setItem('dwellbase_user', JSON.stringify(res.tenant));
-        localStorage.setItem('dwellbase_auth', JSON.stringify({ role: 'tenant', identifier: trimmedId }));
+        setSession('tenant', res.token, res.tenant, { role: 'tenant', identifier: trimmedId });
         navigate('/tenant/dashboard');
       }
     } catch (err: unknown) {

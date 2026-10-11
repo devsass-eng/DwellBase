@@ -9,6 +9,7 @@ import {
   History, CheckCircle2
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
+import { clearSession } from '../api/client';
 
 interface NavItem {
   name: string;
@@ -141,10 +142,7 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
             <Link 
               to={userType === 'super_admin' ? '/superadmin-login' : '/'}
               onClick={() => {
-                localStorage.removeItem('dwellbase_auth');
-                localStorage.removeItem('dwellbase_token');
-                localStorage.removeItem('dwellbase_role');
-                localStorage.removeItem('dwellbase_user');
+                clearSession(userType);
               }}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-200 hover:bg-navy-800 hover:text-red-400 transition-colors"
             >
@@ -260,10 +258,7 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
                   <Link 
                     to={userType === 'super_admin' ? '/superadmin-login' : '/'}
                     onClick={() => {
-                      localStorage.removeItem('dwellbase_auth');
-                      localStorage.removeItem('dwellbase_token');
-                      localStorage.removeItem('dwellbase_role');
-                      localStorage.removeItem('dwellbase_user');
+                      clearSession(userType);
                     }}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
                   >

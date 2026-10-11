@@ -3,31 +3,163 @@
 
 const BASE_URL = (import.meta as { env: Record<string, string> }).env.VITE_API_URL || "http://localhost:4000";
 
-// ─── Token helpers ─────────────────────────────────────────────────────────────
+// ─── Token & Auth helpers ─────────────────────────────────────────────────────
 
-export function getToken(): string | null {
-  return localStorage.getItem("dwellbase_token");
+export type AppRole = 'super_admin' | 'landlord' | 'tenant';
+
+export function detectRole(path?: string): AppRole {
+  if (path && path.startsWith("/api/superadmin")) return "super_admin";
+  if (typeof window !== "undefined") {
+    const pathname = window.location.pathname;
+    if (pathname.startsWith("/superadmin")) return "super_admin";
+    if (pathname.startsWith("/landlord")) return "landlord";
+    if (pathname.startsWith("/tenant")) return "tenant";
+    if (pathname === "/superadmin-login") return "super_admin";
+    if (pathname === "/admin-login" || pathname === "/activate") return "landlord";
+    if (pathname === "/tenant-login") return "tenant";
+
+    try {
+      const sessionRole = sessionStorage.getItem("dwellbase_active_role") as AppRole | null;
+      if (sessionRole && ["super_admin", "landlord", "tenant"].includes(sessionRole)) {
+        return sessionRole;
+      }
+    } catch { /* ignore */ }
+  }
+  const legacyRole = localStorage.getItem("dwellbase_role") as AppRole | null;
+  if (legacyRole && ["super_admin", "landlord", "tenant"].includes(legacyRole)) {
+    return legacyRole;
+  }
+  return "landlord";
 }
 
-export function setToken(token: string): void {
+export function getToken(role?: string): string | null {
+  const targetRole = (role as AppRole) || detectRole();
+  const roleToken = localStorage.getItem(`dwellbase_token_${targetRole}`);
+  if (roleToken) return roleToken;
+
+  // Fallback to legacy single token if role matches or only one exists
+  const legacyRole = localStorage.getItem("dwellbase_role");
+  const legacyToken = localStorage.getItem("dwellbase_token");
+  if (legacyToken && (!legacyRole || legacyRole === targetRole)) {
+    return legacyToken;
+  }
+  return null;
+}
+
+export function setToken(token: string, role?: AppRole): void {
+  const targetRole = role || detectRole();
+  localStorage.setItem(`dwellbase_token_${targetRole}`, token);
   localStorage.setItem("dwellbase_token", token);
 }
 
+export function setSession(
+  role: AppRole,
+  token: string,
+  user: Record<string, unknown> | null | undefined,
+  authInfo: Record<string, unknown>
+): void {
+  // Store role-isolated session keys in localStorage
+  localStorage.setItem(`dwellbase_token_${role}`, token);
+  if (user) {
+    localStorage.setItem(`dwellbase_user_${role}`, JSON.stringify(user));
+  }
+  localStorage.setItem(`dwellbase_auth_${role}`, JSON.stringify(authInfo));
+
+  // Store tab-isolated active role in sessionStorage
+  try {
+    sessionStorage.setItem("dwellbase_active_role", role);
+  } catch { /* ignore */ }
+
+  // Maintain legacy keys for backwards compatibility
+  localStorage.setItem("dwellbase_token", token);
+  localStorage.setItem("dwellbase_role", role);
+  if (user) {
+    localStorage.setItem("dwellbase_user", JSON.stringify(user));
+  }
+  localStorage.setItem("dwellbase_auth", JSON.stringify(authInfo));
+}
+
+export function clearSession(role?: string): void {
+  if (role) {
+    localStorage.removeItem(`dwellbase_token_${role}`);
+    localStorage.removeItem(`dwellbase_user_${role}`);
+    localStorage.removeItem(`dwellbase_auth_${role}`);
+    try {
+      if (sessionStorage.getItem("dwellbase_active_role") === role) {
+        sessionStorage.removeItem("dwellbase_active_role");
+      }
+    } catch { /* ignore */ }
+  } else {
+    // Clear all roles
+    (['super_admin', 'landlord', 'tenant'] as const).forEach((r) => {
+      localStorage.removeItem(`dwellbase_token_${r}`);
+      localStorage.removeItem(`dwellbase_user_${r}`);
+      localStorage.removeItem(`dwellbase_auth_${r}`);
+    });
+    localStorage.removeItem("dwellbase_token");
+    localStorage.removeItem("dwellbase_role");
+    localStorage.removeItem("dwellbase_user");
+    localStorage.removeItem("dwellbase_auth");
+    try {
+      sessionStorage.clear();
+    } catch { /* ignore */ }
+  }
+}
+
 export function clearToken(): void {
-  localStorage.removeItem("dwellbase_token");
-  localStorage.removeItem("dwellbase_role");
-  localStorage.removeItem("dwellbase_user");
-  localStorage.removeItem("dwellbase_auth");
+  clearSession();
 }
 
 export function getRole(): string | null {
-  return localStorage.getItem("dwellbase_role");
+  try {
+    const sessionRole = sessionStorage.getItem("dwellbase_active_role");
+    if (sessionRole) return sessionRole;
+  } catch { /* ignore */ }
+  return detectRole();
+}
+
+export function getAuth(role?: string): { role: string; [key: string]: unknown } | null {
+  const targetRole = role || detectRole();
+  const roleRaw = localStorage.getItem(`dwellbase_auth_${targetRole}`);
+  if (roleRaw) {
+    try {
+      return JSON.parse(roleRaw);
+    } catch { /* ignore */ }
+  }
+  // Fallback to legacy dwellbase_auth if its role matches targetRole
+  const legacyRaw = localStorage.getItem("dwellbase_auth");
+  if (legacyRaw) {
+    try {
+      const parsed = JSON.parse(legacyRaw);
+      if (!targetRole || parsed.role === targetRole) {
+        return parsed;
+      }
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+export function getUser(role?: string): Record<string, unknown> | null {
+  const targetRole = role || detectRole();
+  const roleUserRaw = localStorage.getItem(`dwellbase_user_${targetRole}`);
+  if (roleUserRaw) {
+    try {
+      return JSON.parse(roleUserRaw);
+    } catch { /* ignore */ }
+  }
+  const legacyRaw = localStorage.getItem("dwellbase_user");
+  if (legacyRaw) {
+    try {
+      return JSON.parse(legacyRaw);
+    } catch { /* ignore */ }
+  }
+  return null;
 }
 
 // ─── Core fetch wrapper ────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+  const token = getToken(path.startsWith("/api/superadmin") ? "super_admin" : undefined);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> || {}),

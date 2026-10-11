@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import type { ReactNode } from "react";
 import {
   roomsApi, tenantsApi, chargesApi, paymentsApi,
-  regulationsApi, settingsApi, getToken, getRole
+  regulationsApi, settingsApi, reportsApi, getToken, getRole
 } from "../api/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -417,7 +417,8 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
   const isLandlord = () => getRole() === "landlord";
 
   const refresh = useCallback(async () => {
-    if (!isAuthenticated()) { setLoading(false); return; }
+    const role = getRole();
+    if (!isAuthenticated() || role === "super_admin") { setLoading(false); return; }
     try {
       const [roomsRaw, tenantsRaw, catsRaw, chargesRaw, paymentsRaw, regsRaw] = await Promise.all([
         roomsApi.list().catch(() => []),
@@ -443,9 +444,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
       if (isLandlord()) {
         const [settingsRaw, auditRaw] = await Promise.all([
           settingsApi.get().catch(() => null),
-          fetch("http://localhost:4000/api/reports/audit-logs", {
-            headers: { Authorization: `Bearer ${getToken()}` },
-          }).then(r => r.ok ? r.json() : []).catch(() => []),
+          reportsApi.auditLogs().catch(() => []),
         ]);
         if (settingsRaw) {
           const { profile, paymentSettings, notifPrefs } = mapSettings(settingsRaw);
