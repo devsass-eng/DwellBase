@@ -236,7 +236,7 @@ const DashboardLayout = ({ children, userType, userName, tenantId }: DashboardLa
                 <div className="hidden sm:block text-right">
                   <div className="text-sm font-medium text-gray-700">{userName}</div>
                   <div className="text-xs text-gray-500 font-medium">
-                    {userType === 'super_admin' ? 'Super Admin' : userType.charAt(0).toUpperCase() + userType.slice(1)}
+                    {userType === 'super_admin' ? 'Admin' : userType.charAt(0).toUpperCase() + userType.slice(1)}
                   </div>
                 </div>
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${

@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import pool from "../db.js";
 import { requireLandlord } from "../middleware/auth.js";
 
@@ -7,6 +7,31 @@ const router = Router();
 // GET /api/rooms
 router.get("/", requireLandlord, async (req, res) => {
   try {
+    // Auto-sync room status with currently assigned active tenants
+    await pool.query(
+      `UPDATE rooms r
+       SET status = 'Occupied', updated_at = NOW()
+       WHERE r.landlord_id = $1 AND r.status != 'Maintenance'
+         AND EXISTS (
+           SELECT 1 FROM tenants t
+           WHERE t.room_id = r.id
+             AND t.tenancy_status IN ('Active', 'Upcoming', 'Expiring Soon')
+         )`,
+      [req.user.landlordId]
+    );
+
+    await pool.query(
+      `UPDATE rooms r
+       SET status = 'Vacant', updated_at = NOW()
+       WHERE r.landlord_id = $1 AND r.status = 'Occupied'
+         AND NOT EXISTS (
+           SELECT 1 FROM tenants t
+           WHERE t.room_id = r.id
+             AND t.tenancy_status IN ('Active', 'Upcoming', 'Expiring Soon')
+         )`,
+      [req.user.landlordId]
+    );
+
     const { rows } = await pool.query(
       "SELECT * FROM rooms WHERE landlord_id=$1 AND archived=false ORDER BY sequence_number",
       [req.user.landlordId]

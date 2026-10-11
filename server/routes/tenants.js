@@ -81,7 +81,13 @@ router.post("/", requireLandlord, async (req, res) => {
         tenancyStatus||"Upcoming", finalAccountStatus
       ]
     );
-    const { password_hash: _ph, ...safe } = rows[0];
+    // Mark room as Occupied if assigned
+    if (roomId) {
+      await pool.query(
+        "UPDATE rooms SET status = 'Occupied', updated_at = NOW() WHERE id = $1 AND landlord_id = $2",
+        [roomId, req.user.landlordId]
+      );
+    }
 
     // If login was created, include the temporary password so landlord can share it
     const response = { ...safe };
@@ -199,6 +205,55 @@ router.post("/:id/reset-password", requireLandlord, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to reset tenant password" });
+  }
+});
+
+// DELETE /api/tenants/:id (landlord permanently deletes tenant)
+router.delete("/:id", requireLandlord, async (req, res) => {
+  try {
+    const tenantRes = await pool.query(
+      "SELECT * FROM tenants WHERE id=$1 AND landlord_id=$2",
+      [req.params.id, req.user.landlordId]
+    );
+    if (tenantRes.rows.length === 0) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+    const tenant = tenantRes.rows[0];
+
+    // Detach references in charges & payments to avoid foreign key violation
+    await pool.query(
+      "UPDATE charges SET tenant_id = NULL WHERE tenant_id = $1",
+      [tenant.id]
+    );
+    await pool.query(
+      "UPDATE payments SET tenant_id = NULL WHERE tenant_id = $1",
+      [tenant.id]
+    );
+
+    // Delete tenant
+    await pool.query(
+      "DELETE FROM tenants WHERE id = $1 AND landlord_id = $2",
+      [tenant.id, req.user.landlordId]
+    );
+
+    // If tenant had a room, check if any active tenants remain; if not, mark Vacant
+    if (tenant.room_id) {
+      const activeInRoom = await pool.query(
+        "SELECT 1 FROM tenants WHERE room_id=$1 AND tenancy_status IN ('Active','Upcoming','Expiring Soon') LIMIT 1",
+        [tenant.room_id]
+      );
+      if (activeInRoom.rows.length === 0) {
+        await pool.query(
+          "UPDATE rooms SET status = 'Vacant', updated_at = NOW() WHERE id=$1",
+          [tenant.room_id]
+        );
+      }
+    }
+
+    res.json({ success: true, message: "Tenant deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete tenant" });
   }
 });
 

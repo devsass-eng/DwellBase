@@ -327,6 +327,7 @@ interface AppDataContextType {
   updateTenant: (id: string, updates: Partial<Tenant>) => Promise<void>;
   endTenancy: (tenantId: string) => Promise<void>;
   removeTenant: (tenantId: string, reason: string) => Promise<{ success: boolean; debtWarning?: string }>;
+  deleteTenant: (tenantId: string) => Promise<void>;
 
   // Billing Categories
   categories: BillingCategory[];
@@ -589,6 +590,21 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [tenants, charges, updateTenant, updateRoom]);
 
+  const deleteTenant = useCallback(async (tenantId: string) => {
+    const tenant = tenants.find(t => t.id === tenantId);
+    await tenantsApi.delete(tenantId);
+    setTenants(prev => prev.filter(t => t.id !== tenantId));
+    if (tenant?.roomId) {
+      const remainingActive = tenants.filter(
+        t => t.id !== tenantId && t.roomId === tenant.roomId &&
+        ['Active', 'Upcoming', 'Expiring Soon'].includes(t.tenancyStatus)
+      );
+      if (remainingActive.length === 0) {
+        setRooms(prev => prev.map(r => r.id === tenant.roomId ? { ...r, status: "Vacant" } : r));
+      }
+    }
+  }, [tenants]);
+
   // ── Categories ────────────────────────────────────────────────────────────────
 
   const addCategory = useCallback(async (cat: Omit<BillingCategory, "id" | "createdAt" | "isDefault">) => {
@@ -749,7 +765,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
     <AppDataContext.Provider value={{
       loading,
       rooms, nextRoomSequence, addRoom, updateRoom, archiveRoom,
-      tenants, addTenant, updateTenant, endTenancy, removeTenant,
+      tenants, addTenant, updateTenant, endTenancy, removeTenant, deleteTenant,
       categories, addCategory, updateCategory, archiveCategory,
       charges, issueCharge, recalculateChargeStatus, recordCorrection,
       payments, recordCashPayment, initiateMoneyPayment, updatePaymentStatus, reversePayment,

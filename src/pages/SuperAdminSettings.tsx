@@ -72,7 +72,7 @@ const SuperAdminSettings = () => {
   };
 
   return (
-    <DashboardLayout userType="super_admin" userName="Super Administrator">
+    <DashboardLayout userType="super_admin" userName="Admin">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div>
@@ -170,7 +170,7 @@ const SuperAdminSettings = () => {
               </div>
             </div>
 
-            {/* Section 3: Official Super Admin Contact & MoMo */}
+            {/* Section 3: Official Admin Contact & MoMo */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <Phone className="w-5 h-5 text-teal-600" />

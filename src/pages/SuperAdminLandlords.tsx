@@ -318,7 +318,7 @@ const SuperAdminLandlords = () => {
     });
 
   return (
-    <DashboardLayout userType="super_admin" userName="Super Administrator">
+    <DashboardLayout userType="super_admin" userName="Admin">
       <div className="space-y-6">
         
         {/* Header & Add Landlord Button */}

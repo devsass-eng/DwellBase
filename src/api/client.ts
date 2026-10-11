@@ -255,6 +255,8 @@ export const tenantsApi = {
       temporaryPassword: string;
       loginCredentials: { tenantId: string; temporaryPassword: string; message: string };
     }>(`/api/tenants/${id}/reset-password`, { method: "POST" }),
+  delete: (id: string) =>
+    apiFetch<{ success: boolean; message: string }>(`/api/tenants/${id}`, { method: "DELETE" }),
 };
 
 // ─── Charges ─────────────────────────────────────────────────────────────────

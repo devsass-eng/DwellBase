@@ -18,7 +18,7 @@ const SuperAdminDashboard = () => {
   }, []);
 
   return (
-    <DashboardLayout userType="super_admin" userName="Super Administrator">
+    <DashboardLayout userType="super_admin" userName="Admin">
       <div className="space-y-6">
         
         {/* Welcome Banner */}
@@ -28,7 +28,7 @@ const SuperAdminDashboard = () => {
               <ShieldCheck className="w-4 h-4" />
               <span>Platform Owner Supervision</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Super Admin Overview</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Overview</h1>
             <p className="text-slate-300 text-sm mt-2 leading-relaxed">
               Governance center for DwellBase landlord provisioning, one-time payment verification, permanent workspace activations, and immutable audit logs.
             </p>

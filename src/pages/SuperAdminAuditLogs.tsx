@@ -66,7 +66,7 @@ const SuperAdminAuditLogs = () => {
   };
 
   return (
-    <DashboardLayout userType="super_admin" userName="Super Administrator">
+    <DashboardLayout userType="super_admin" userName="Admin">
       <div className="space-y-6">
         <div>
           <div className="flex items-center gap-2.5">
@@ -137,7 +137,7 @@ const SuperAdminAuditLogs = () => {
                     <th className="py-3 px-4">Action</th>
                     <th className="py-3 px-4">Subject / Landlord</th>
                     <th className="py-3 px-4">Administrative Memo / Details</th>
-                    <th className="py-3 px-4">Super Admin Actor</th>
+                    <th className="py-3 px-4">Admin Actor</th>
                     <th className="py-3 px-4">Timestamp</th>
                   </tr>
                 </thead>

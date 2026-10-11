@@ -8,11 +8,12 @@ import {
   Plus, Search, Filter, 
   UserPlus,
   X, AlertCircle, Edit3, Trash2,
-  AlertTriangle, Eye, ShieldCheck, Copy, CheckCircle, Key
+  AlertTriangle, Eye, ShieldCheck, Copy, CheckCircle, Key,
+  Lock, Unlock
 } from 'lucide-react';
 
 const TenantsManagement = () => {
-  const { rooms, tenants, charges, addTenant, updateTenant, removeTenant, landlordProfile } = useAppData();
+  const { rooms, tenants, charges, addTenant, updateTenant, removeTenant, deleteTenant, landlordProfile } = useAppData();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -24,6 +25,9 @@ const TenantsManagement = () => {
   const [editForm, setEditForm] = useState({ fullName: '', phone: '', email: '', monthlyRent: 0 });
   const [removingTenant, setRemovingTenant] = useState<Tenant | null>(null);
   const [removalReason, setRemovalReason] = useState('');
+  const [deletingTenant, setDeletingTenant] = useState<Tenant | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [togglingStatusId, setTogglingStatusId] = useState<string | null>(null);
 
   // Credentials modal state
   const [showCredentials, setShowCredentials] = useState(false);
@@ -48,6 +52,37 @@ const TenantsManagement = () => {
       alert(err instanceof Error ? err.message : 'Failed to reset password');
     } finally {
       setResettingId(null);
+    }
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!deletingTenant) return;
+    setIsDeleting(true);
+    try {
+      await deleteTenant(deletingTenant.id);
+      if (viewingTenant?.id === deletingTenant.id) {
+        setViewingTenant(null);
+      }
+      setDeletingTenant(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete tenant');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleToggleAccountStatus = async (tenant: Tenant) => {
+    try {
+      setTogglingStatusId(tenant.id);
+      const newStatus = tenant.accountStatus === 'Suspended' ? 'Active' : 'Suspended';
+      await updateTenant(tenant.id, { accountStatus: newStatus });
+      if (viewingTenant?.id === tenant.id) {
+        setViewingTenant({ ...viewingTenant, accountStatus: newStatus });
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update account status');
+    } finally {
+      setTogglingStatusId(null);
     }
   };
 
@@ -307,15 +342,32 @@ const TenantsManagement = () => {
                         <div className="text-xs text-slate-500">{formatReadableDate(tenant.endDate)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(tenant.tenancyStatus)}`}>
-                          {tenant.tenancyStatus}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge(tenant.tenancyStatus)}`}>
+                            {tenant.tenancyStatus}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md ${
+                            tenant.accountStatus === 'Suspended'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : tenant.accountStatus === 'Active'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {tenant.accountStatus === 'Suspended' ? (
+                              <><Lock className="w-3 h-3 text-rose-600" /> Suspended</>
+                            ) : tenant.accountStatus === 'Active' ? (
+                              <><CheckCircle className="w-3 h-3 text-emerald-600" /> Active Login</>
+                            ) : (
+                              tenant.accountStatus
+                            )}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                      <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
                         <button 
                           onClick={() => setViewingTenant(tenant)}
                           className="px-2.5 py-1 text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors inline-flex items-center gap-1"
-                          title="View Details"
+                          title="View Details & Account Management"
                         >
                           <Eye className="w-3.5 h-3.5" /> Details
                         </button>
@@ -326,6 +378,22 @@ const TenantsManagement = () => {
                           title="Generate / Reset Temporary Password"
                         >
                           <Key className="w-3.5 h-3.5" /> {resettingId === tenant.id ? 'Resetting...' : 'Password'}
+                        </button>
+                        <button 
+                          onClick={() => handleToggleAccountStatus(tenant)}
+                          disabled={togglingStatusId === tenant.id}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors inline-flex items-center gap-1 disabled:opacity-50 ${
+                            tenant.accountStatus === 'Suspended'
+                              ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                              : 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+                          }`}
+                          title={tenant.accountStatus === 'Suspended' ? 'Reactivate tenant login access' : 'Suspend tenant login access'}
+                        >
+                          {tenant.accountStatus === 'Suspended' ? (
+                            <><Unlock className="w-3.5 h-3.5" /> Reactivate</>
+                          ) : (
+                            <><Lock className="w-3.5 h-3.5" /> Suspend</>
+                          )}
                         </button>
                         <button 
                           onClick={() => {
@@ -348,12 +416,19 @@ const TenantsManagement = () => {
                               setRemovingTenant(tenant);
                               setRemovalReason('');
                             }}
-                            className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors inline-flex items-center gap-1"
-                            title="End Tenancy & Remove Tenant"
+                            className="px-2.5 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors inline-flex items-center gap-1"
+                            title="End Tenancy Contract"
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> End Tenancy
+                            End Tenancy
                           </button>
                         )}
+                        <button 
+                          onClick={() => setDeletingTenant(tenant)}
+                          className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors inline-flex items-center gap-1"
+                          title="Permanently Delete Tenant"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -370,13 +445,13 @@ const TenantsManagement = () => {
           </div>
         )}
 
-        {/* ── MODAL: VIEW TENANT DETAILS ────────────────────────────────────── */}
+        {/* ── MODAL: VIEW TENANT DETAILS & ACCOUNT MANAGEMENT ───────────── */}
         {viewingTenant && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-navy-900/40 backdrop-blur-sm" onClick={() => setViewingTenant(null)} />
-            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="text-lg font-bold text-slate-900">Tenant Profile</h3>
+                <h3 className="text-lg font-bold text-slate-900">Tenant Profile & Management</h3>
                 <button onClick={() => setViewingTenant(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-3 text-sm">
@@ -387,18 +462,60 @@ const TenantsManagement = () => {
                 <div><span className="text-xs text-slate-400 block">Contract Period</span><span>{formatReadableDate(viewingTenant.startDate)} to {formatReadableDate(viewingTenant.endDate)}</span></div>
                 <div><span className="text-xs text-slate-400 block">Agreed Monthly Rent</span><strong>{formatGHS(viewingTenant.monthlyRent)}</strong></div>
                 <div><span className="text-xs text-slate-400 block">Tenancy Status</span><span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadge(viewingTenant.tenancyStatus)}`}>{viewingTenant.tenancyStatus}</span></div>
-                <div><span className="text-xs text-slate-400 block">Login Account</span><span className="font-semibold text-teal-700">{viewingTenant.accountStatus}</span></div>
-                <div className="pt-2 flex justify-end">
-                  <button
-                    onClick={() => {
-                      const t = viewingTenant;
-                      setViewingTenant(null);
-                      handleResetPassword(t);
-                    }}
-                    className="px-3.5 py-2 bg-teal-600 text-white rounded-xl text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5 shadow-sm transition-colors"
-                  >
-                    <Key className="w-3.5 h-3.5" /> Reset Temporary Password
-                  </button>
+
+                {/* Account & Login Access Management Card */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account & Login Access</span>
+                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                      viewingTenant.accountStatus === 'Suspended'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {viewingTenant.accountStatus === 'Suspended' ? <Lock className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+                      {viewingTenant.accountStatus}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    The tenant can sign in with their Tenant ID (<span className="font-mono font-semibold">{viewingTenant.tenantId}</span>), Phone, or Email.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        const t = viewingTenant;
+                        setViewingTenant(null);
+                        handleResetPassword(t);
+                      }}
+                      className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <Key className="w-3.5 h-3.5" /> Reset Password
+                    </button>
+                    <button
+                      onClick={() => handleToggleAccountStatus(viewingTenant)}
+                      disabled={togglingStatusId === viewingTenant.id}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                        viewingTenant.accountStatus === 'Suspended'
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                      }`}
+                    >
+                      {viewingTenant.accountStatus === 'Suspended' ? (
+                        <><Unlock className="w-3.5 h-3.5" /> Reactivate Login</>
+                      ) : (
+                        <><Lock className="w-3.5 h-3.5" /> Suspend Login</>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const t = viewingTenant;
+                        setViewingTenant(null);
+                        setDeletingTenant(t);
+                      }}
+                      className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold hover:bg-rose-100 flex items-center gap-1.5 transition-colors ml-auto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Tenant
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end pt-3 border-t">
@@ -516,6 +633,56 @@ const TenantsManagement = () => {
                   className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold hover:bg-rose-700"
                 >
                   Confirm End of Tenancy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: PERMANENTLY DELETE TENANT ────────────────────────────── */}
+        {deletingTenant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-navy-900/60 backdrop-blur-sm" onClick={() => !isDeleting && setDeletingTenant(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center gap-3 text-rose-600">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Permanently Delete Tenant</h3>
+                  <p className="text-xs text-slate-500">This action cannot be undone.</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Are you sure you want to permanently delete <strong>{deletingTenant.fullName}</strong> (<span className="font-mono font-medium">{deletingTenant.tenantId}</span>) from room <strong>{deletingTenant.roomNumber}</strong>?
+              </p>
+
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+                <strong>What happens when deleted:</strong>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                  <li>Tenant login credentials and profile are permanently removed.</li>
+                  <li>Assigned room ({deletingTenant.roomNumber}) is freed and marked <strong>Vacant</strong> if no other tenants share the room.</li>
+                  <li>Historical charges and payments remain saved for accounting integrity with detached tenant links.</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setDeletingTenant(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteTenant}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold hover:bg-rose-700 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeleting ? 'Deleting...' : 'Permanently Delete'}
                 </button>
               </div>
             </div>

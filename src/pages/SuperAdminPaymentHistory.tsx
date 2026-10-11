@@ -84,7 +84,7 @@ const SuperAdminPaymentHistory = () => {
   };
 
   return (
-    <DashboardLayout userType="super_admin" userName="Super Administrator">
+    <DashboardLayout userType="super_admin" userName="Admin">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
