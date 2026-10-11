@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
-import { useAppData } from '../context/AppDataContext';
+import { useAppData, useCurrentTenant } from '../context/AppDataContext';
 import { useNotifications } from '../context/NotificationContext';
 import { User, Shield, Bell, CreditCard, Building, Key, Info } from 'lucide-react';
 
 const TenantSettings = () => {
-  const { tenants, updateTenant, landlordProfile, landlordPaymentSettings } = useAppData();
+  const { updateTenant, landlordProfile, landlordPaymentSettings } = useAppData();
   const { notify } = useNotifications();
 
-  const myTenant = tenants.find(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming');
+  const myTenant = useCurrentTenant();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'payment_info'>('profile');
 

@@ -185,37 +185,55 @@ const AdminPayments = () => {
   const handleIssueCharge = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     setChargeFormError('');
-    const tenant = tenants.find(t => t.id === chargeForm.tenantId);
-    if (!tenant) return setChargeFormError('Please select a tenant.');
+    if (!chargeForm.tenantId) return setChargeFormError('Please select a tenant or choose All Active Tenants.');
     if (!chargeForm.categoryId) return setChargeFormError('Please select a category.');
     const amount = parseFloat(chargeForm.amount);
     if (isNaN(amount) || amount <= 0) return setChargeFormError('Enter a valid amount.');
     if (!chargeForm.dueDate) return setChargeFormError('Due date is required.');
     if (!chargeForm.billingPeriod.trim()) return setChargeFormError('Billing period is required.');
 
+    const targetTenants = chargeForm.tenantId === 'ALL'
+      ? tenants.filter(t => t.tenancyStatus !== 'Ended')
+      : tenants.filter(t => t.id === chargeForm.tenantId);
+
+    if (targetTenants.length === 0) {
+      return setChargeFormError('No active tenants found to issue charge to.');
+    }
+
     setIsChargeSubmitting(true);
     const cat = categories.find(c => c.id === chargeForm.categoryId);
-    setTimeout(() => {
-      issueCharge({
-        categoryId: chargeForm.categoryId,
-        categoryName: cat?.name || '',
-        tenantId: tenant.id,
-        tenantName: tenant.fullName,
-        roomId: tenant.roomId,
-        roomNumber: tenant.roomNumber,
-        amount,
-        issueDate: new Date().toISOString().split('T')[0],
-        dueDate: chargeForm.dueDate,
-        billingPeriod: chargeForm.billingPeriod,
-        issuedBy: 'Admin',
-      });
-      notify({ recipientType: 'landlord', title: 'Charge Issued', message: `${cat?.name} bill of ${formatGHS(amount)} issued to ${tenant.fullName}.`, type: 'info' });
-      notify({ recipientType: 'tenant', recipientId: tenant.id, title: 'New Bill Issued', message: `A new ${cat?.name} bill of ${formatGHS(amount)} has been issued. Due: ${new Date(chargeForm.dueDate).toLocaleDateString()}.`, type: 'warning' });
+
+    Promise.all(
+      targetTenants.map(t =>
+        issueCharge({
+          categoryId: chargeForm.categoryId,
+          categoryName: cat?.name || '',
+          tenantId: t.id,
+          tenantName: t.fullName,
+          roomId: t.roomId,
+          roomNumber: t.roomNumber,
+          amount,
+          issueDate: new Date().toISOString().split('T')[0],
+          dueDate: chargeForm.dueDate,
+          billingPeriod: chargeForm.billingPeriod,
+          issuedBy: landlordProfile.fullName || 'Landlord',
+        })
+      )
+    ).then(() => {
+      if (chargeForm.tenantId === 'ALL') {
+        notify({ recipientType: 'landlord', title: 'Batch Charges Issued', message: `${cat?.name} bill of ${formatGHS(amount)} issued to all ${targetTenants.length} tenants.`, type: 'info' });
+      } else {
+        notify({ recipientType: 'landlord', title: 'Charge Issued', message: `${cat?.name} bill of ${formatGHS(amount)} issued to ${targetTenants[0].fullName}.`, type: 'info' });
+        notify({ recipientType: 'tenant', recipientId: targetTenants[0].id, title: 'New Bill Issued', message: `A new ${cat?.name} bill of ${formatGHS(amount)} has been issued. Due: ${new Date(chargeForm.dueDate).toLocaleDateString()}.`, type: 'warning' });
+      }
       setIsChargeSubmitting(false);
       setChargeForm({ tenantId: '', categoryId: '', amount: '', dueDate: '', billingPeriod: '' });
       setIsChargeModalOpen(false);
-    }, 500);
-  }, [chargeForm, tenants, categories, issueCharge, notify]);
+    }).catch(err => {
+      setIsChargeSubmitting(false);
+      setChargeFormError(err instanceof Error ? err.message : 'Failed to issue charge');
+    });
+  }, [chargeForm, tenants, categories, issueCharge, notify, landlordProfile]);
 
   const handleAddCategory = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -657,13 +675,21 @@ const AdminPayments = () => {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tenant <span className="text-red-500">*</span></label>
-                  <select required value={chargeForm.tenantId} onChange={e => setChargeForm(f => ({ ...f, tenantId: e.target.value }))} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none bg-white">
-                    <option value="">Select tenant</option>
-                    {tenants.filter(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming').map(t => (
-                      <option key={t.id} value={t.id}>{t.fullName} — Room {t.roomNumber}</option>
-                    ))}
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Select Tenant Recipient <span className="text-red-500">*</span></label>
+                  <select required value={chargeForm.tenantId} onChange={e => setChargeForm(f => ({ ...f, tenantId: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-teal-500 outline-none bg-white text-sm">
+                    <option value="">Select recipient...</option>
+                    <option value="ALL">★ All Active Tenants (Batch Charge to All)</option>
+                    <optgroup label="Individual Tenants">
+                      {tenants.filter(t => t.tenancyStatus !== 'Ended').map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.fullName} — Room {t.roomNumber} ({t.tenantId})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Select a specific tenant, or choose "All Active Tenants" to bill everyone at once.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Category <span className="text-red-500">*</span></label>

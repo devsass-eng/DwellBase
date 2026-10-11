@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
-import { useAppData } from '../context/AppDataContext';
+import { useAppData, useCurrentTenant } from '../context/AppDataContext';
 import { formatReadableDate, formatGHS } from '../utils/reportUtils';
 import { 
   AlertCircle, DollarSign, Calendar,
@@ -31,12 +31,10 @@ const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }: {
 );
 
 const TenantDashboard = () => {
-  const { tenants, charges, payments, landlordProfile, getTenantOutstandingBalance } = useAppData();
+  const { charges, payments, landlordProfile, getTenantOutstandingBalance } = useAppData();
 
-  // Scoped to active tenant
-  const myTenant = useMemo(() => {
-    return tenants.find(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming') || null;
-  }, [tenants]);
+  // Scoped to active logged-in tenant
+  const myTenant = useCurrentTenant();
 
   // Tenant's personal charges and payments
   const myCharges = useMemo(() => {

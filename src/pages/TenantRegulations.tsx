@@ -1,13 +1,10 @@
 import DashboardLayout from '../components/DashboardLayout';
-import { useAppData } from '../context/AppDataContext';
+import { useAppData, useCurrentTenant } from '../context/AppDataContext';
 import { ClipboardList, Shield } from 'lucide-react';
 
 const TenantRegulations = () => {
-  const { regulations, tenants } = useAppData();
-
-  // In a real app, you would get the authenticated tenant's ID from a session or token.
-  // For this demo, we'll pick the first active tenant to represent the logged-in user.
-  const myTenant = tenants.find(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming') || null;
+  const { regulations } = useAppData();
+  const myTenant = useCurrentTenant();
 
   if (!myTenant) {
     return (

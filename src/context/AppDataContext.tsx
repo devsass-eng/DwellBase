@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import type { ReactNode } from "react";
 import {
   roomsApi, tenantsApi, chargesApi, paymentsApi,
-  regulationsApi, settingsApi, reportsApi, getToken, getRole
+  regulationsApi, settingsApi, reportsApi, getToken, getRole, getUser
 } from "../api/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -770,4 +770,11 @@ export const useAppData = () => {
   const ctx = useContext(AppDataContext);
   if (!ctx) throw new Error("useAppData must be used within AppDataProvider");
   return ctx;
+};
+
+export const useCurrentTenant = (): Tenant | null => {
+  const { tenants } = useAppData();
+  const user = getUser("tenant") as { id?: string; tenant_id?: string } | null;
+  if (!user) return tenants[0] || null;
+  return tenants.find(t => t.id === user.id || t.tenantId === user.tenant_id) || tenants[0] || null;
 };

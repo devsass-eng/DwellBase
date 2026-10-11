@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import ReceiptModal from '../components/ReceiptModal';
-import { useAppData } from '../context/AppDataContext';
+import { useAppData, useCurrentTenant } from '../context/AppDataContext';
 import type { PaymentRecord } from '../context/AppDataContext';
 import {
   formatReadableDate,
@@ -18,14 +18,12 @@ type TenantTab = 'payments' | 'bills' | 'tenancy' | 'receipts';
 
 const TenantReports = () => {
   const {
-    tenants, charges, payments, landlordProfile,
+    charges, payments, landlordProfile,
     getTenantOutstandingBalance, getTenantTotalPaid
   } = useAppData();
 
-  // Logged in tenant (in this demo, Kwesi Mensah or first active tenant)
-  const myTenant = useMemo(() => {
-    return tenants.find(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming') || null;
-  }, [tenants]);
+  // Logged in tenant scoped to current active session
+  const myTenant = useCurrentTenant();
 
   // Tab State
   const [activeTab, setActiveTab] = useState<TenantTab>('payments');

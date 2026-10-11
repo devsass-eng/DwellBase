@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import ReceiptModal from '../components/ReceiptModal';
-import { useAppData } from '../context/AppDataContext';
+import { useAppData, useCurrentTenant } from '../context/AppDataContext';
 import type { Charge, MomoNetwork, PaymentRecord } from '../context/AppDataContext';
 import { useNotifications } from '../context/NotificationContext';
 import {
@@ -37,12 +37,11 @@ const NETWORKS: { id: MomoNetwork; label: string; color: string }[] = [
 ];
 
 const TenantPayments = () => {
-  // ── In real app, get from auth. For now, use first active tenant ──────────────
-  const { tenants, charges, payments, categories, getTenantOutstandingBalance, getTenantTotalPaid, initiateMoneyPayment, landlordProfile } = useAppData();
+  const { charges, payments, categories, getTenantOutstandingBalance, getTenantTotalPaid, initiateMoneyPayment, landlordProfile } = useAppData();
   const { notify } = useNotifications();
 
-  // Use the first active tenant as demo logged-in tenant
-  const myTenant = tenants.find(t => t.tenancyStatus === 'Active' || t.tenancyStatus === 'Upcoming') || null;
+  // Scoped to active logged-in tenant
+  const myTenant = useCurrentTenant();
 
   const myCharges = useMemo(() => myTenant ? charges.filter(c => c.tenantId === myTenant.id) : [], [charges, myTenant]);
   const myPayments = useMemo(() => myTenant ? payments.filter(p => p.tenantId === myTenant.id) : [], [payments, myTenant]);
