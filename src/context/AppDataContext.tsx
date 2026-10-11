@@ -322,7 +322,8 @@ interface AppDataContextType {
 
   // Tenants
   tenants: Tenant[];
-  addTenant: (tenant: Omit<Tenant, "id">) => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addTenant: (tenant: Omit<Tenant, "id"> & { createLogin?: string }) => Promise<any>;
   updateTenant: (id: string, updates: Partial<Tenant>) => Promise<void>;
   endTenancy: (tenantId: string) => Promise<void>;
   removeTenant: (tenantId: string, reason: string) => Promise<{ success: boolean; debtWarning?: string }>;
@@ -505,7 +506,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Tenants ──────────────────────────────────────────────────────────────────
 
-  const addTenant = useCallback(async (tenantData: Omit<Tenant, "id">) => {
+  const addTenant = useCallback(async (tenantData: Omit<Tenant, "id"> & { createLogin?: string }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await tenantsApi.create(tenantData as any) as any;
     const tenant = mapTenant(raw);
@@ -513,6 +514,8 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
     if (tenantData.roomId) {
       setRooms(prev => prev.map(r => r.id === tenantData.roomId ? { ...r, status: "Occupied" } : r));
     }
+    // Return the raw response so the caller can access loginCredentials
+    return raw;
   }, []);
 
   const updateTenant = useCallback(async (id: string, updates: Partial<Tenant>) => {

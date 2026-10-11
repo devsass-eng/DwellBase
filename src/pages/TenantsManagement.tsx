@@ -7,7 +7,7 @@ import {
   Plus, Search, Filter, 
   UserPlus,
   X, AlertCircle, Edit3, Trash2,
-  AlertTriangle, Eye, ShieldCheck
+  AlertTriangle, Eye, ShieldCheck, Copy, CheckCircle, Key
 } from 'lucide-react';
 
 const TenantsManagement = () => {
@@ -23,6 +23,11 @@ const TenantsManagement = () => {
   const [editForm, setEditForm] = useState({ fullName: '', phone: '', email: '', monthlyRent: 0 });
   const [removingTenant, setRemovingTenant] = useState<Tenant | null>(null);
   const [removalReason, setRemovalReason] = useState('');
+
+  // Credentials modal state
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{ tenantId: string; temporaryPassword: string; fullName: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -89,7 +94,13 @@ const TenantsManagement = () => {
     setFormError('');
   };
 
-  const handleSaveTenant = (e: React.FormEvent) => {
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleSaveTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
@@ -103,8 +114,8 @@ const TenantsManagement = () => {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      addTenant({
+    try {
+      const result = await addTenant({
         tenantId: generatedTenantId,
         fullName: formData.fullName,
         phone: formData.phone,
@@ -118,15 +129,30 @@ const TenantsManagement = () => {
         endDate: calculatedEndDate,
         totalContractualRent,
         amountPaid: 0,
-        outstandingBalance: 0, // Charges will track actual billing
+        outstandingBalance: 0,
         tenancyStatus: new Date(formData.startDate) > new Date() ? 'Upcoming' : 'Active',
-        accountStatus: formData.createLogin === 'now' ? 'Invitation Pending' : 'Not Set Up'
+        accountStatus: formData.createLogin === 'now' ? 'Active' : 'Not Set Up',
+        createLogin: formData.createLogin
       });
 
-      setIsSubmitting(false);
       setIsAddModalOpen(false);
+
+      // If credentials were generated, show them
+      if (result?.loginCredentials) {
+        setCreatedCredentials({
+          tenantId: result.loginCredentials.tenantId,
+          temporaryPassword: result.loginCredentials.temporaryPassword,
+          fullName: formData.fullName
+        });
+        setShowCredentials(true);
+      }
+
       resetForm();
-    }, 600);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create tenant');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -520,6 +546,79 @@ const TenantsManagement = () => {
                         <label className="block text-sm font-medium text-slate-700 mb-1">Tenancy Start Date <span className="text-red-500">*</span></label>
                         <input type="date" required value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm" />
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Duration <span className="text-red-500">*</span></label>
+                        <select value={formData.durationMonths} onChange={(e) => setFormData({ ...formData, durationMonths: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                          <option value="6">6 Months</option>
+                          <option value="12">12 Months (1 Year)</option>
+                          <option value="24">24 Months (2 Years)</option>
+                          <option value="custom">Custom Duration</option>
+                        </select>
+                      </div>
+                      {formData.durationMonths === 'custom' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Custom Duration (Months)</label>
+                          <input type="number" min="1" max="120" placeholder="e.g. 18" value={formData.customDuration} onChange={(e) => setFormData({ ...formData, customDuration: e.target.value })} className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contract Summary */}
+                    {selectedRoom && activeDuration > 0 && (
+                      <div className="mt-4 p-4 bg-teal-50 border border-teal-200 rounded-xl">
+                        <h5 className="text-xs font-bold text-teal-800 uppercase mb-2">Contract Summary</h5>
+                        <div className="grid grid-cols-3 gap-3 text-sm">
+                          <div>
+                            <span className="text-xs text-teal-600 block">Monthly Rent</span>
+                            <strong className="text-teal-900">{formatGHS(selectedRoom.monthlyRent)}</strong>
+                          </div>
+                          <div>
+                            <span className="text-xs text-teal-600 block">End Date</span>
+                            <strong className="text-teal-900">{calculatedEndDate ? formatReadableDate(calculatedEndDate) : '—'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-xs text-teal-600 block">Total Contract</span>
+                            <strong className="text-teal-900">{formatGHS(totalContractualRent)}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Section C: Login Access */}
+                  <section>
+                    <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
+                      3. Tenant Login Access
+                    </h4>
+                    <div className="space-y-3">
+                      <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 cursor-pointer transition-colors">
+                        <input
+                          type="radio"
+                          name="createLogin"
+                          value="now"
+                          checked={formData.createLogin === 'now'}
+                          onChange={() => setFormData({ ...formData, createLogin: 'now' })}
+                          className="mt-0.5 accent-teal-600"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-slate-800">Create login now</span>
+                          <p className="text-xs text-slate-500 mt-0.5">A temporary password will be generated. Share it with the tenant so they can log in to their portal.</p>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 cursor-pointer transition-colors">
+                        <input
+                          type="radio"
+                          name="createLogin"
+                          value="later"
+                          checked={formData.createLogin === 'later'}
+                          onChange={() => setFormData({ ...formData, createLogin: 'later' })}
+                          className="mt-0.5 accent-teal-600"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-slate-800">Set up later</span>
+                          <p className="text-xs text-slate-500 mt-0.5">The tenant record will be created without login access. You can set it up anytime from the tenant details.</p>
+                        </div>
+                      </label>
                     </div>
                   </section>
                 </form>
@@ -540,6 +639,89 @@ const TenantsManagement = () => {
                 </button>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL: TENANT CREDENTIALS ────────────────────────────────────── */}
+        {showCredentials && createdCredentials && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-navy-900/50 backdrop-blur-sm" />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+              
+              {/* Header */}
+              <div className="text-center">
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Key className="w-7 h-7" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">Tenant Account Created!</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Login credentials for <strong>{createdCredentials.fullName}</strong>
+                </p>
+              </div>
+
+              {/* Credentials */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Tenant Login ID</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-gray-200 font-mono text-sm text-slate-800 select-all">
+                      {createdCredentials.tenantId}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(createdCredentials.tenantId, 'id')}
+                      className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                      title="Copy"
+                    >
+                      {copiedField === 'id' ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Temporary Password</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-gray-200 font-mono text-sm text-slate-800 select-all">
+                      {createdCredentials.temporaryPassword}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(createdCredentials.temporaryPassword, 'pw')}
+                      className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                      title="Copy"
+                    >
+                      {copiedField === 'pw' ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Copy All button */}
+              <button
+                onClick={() => copyToClipboard(
+                  `DwellBase Login Credentials\nTenant ID: ${createdCredentials.tenantId}\nPassword: ${createdCredentials.temporaryPassword}\n\nPlease change your password after first login.`,
+                  'all'
+                )}
+                className="w-full py-2.5 bg-teal-50 text-teal-700 rounded-xl text-sm font-semibold hover:bg-teal-100 transition-colors flex items-center justify-center gap-2"
+              >
+                {copiedField === 'all' ? (
+                  <><CheckCircle className="w-4 h-4" /> Copied to Clipboard!</>
+                ) : (
+                  <><Copy className="w-4 h-4" /> Copy All Credentials</>
+                )}
+              </button>
+
+              {/* Warning */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                <AlertTriangle className="w-4 h-4 inline mr-1" />
+                <strong>Important:</strong> This is the only time the temporary password will be shown. Please share it securely with the tenant.
+              </div>
+
+              {/* Close button */}
+              <button
+                onClick={() => { setShowCredentials(false); setCreatedCredentials(null); }}
+                className="w-full py-2.5 bg-navy-900 text-white rounded-xl text-sm font-semibold hover:bg-navy-800 transition-colors"
+              >
+                Done
+              </button>
             </div>
           </div>
         )}

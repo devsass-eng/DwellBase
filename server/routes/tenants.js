@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import bcrypt from "bcryptjs";
 import pool from "../db.js";
 import { requireLandlord, requireTenant, requireAuth } from "../middleware/auth.js";
@@ -42,29 +42,59 @@ router.post("/", requireLandlord, async (req, res) => {
     tenantId, fullName, phone, email, roomId, roomNumber, roomCode,
     monthlyRent, startDate, durationMonths, endDate,
     totalContractualRent, amountPaid, outstandingBalance,
-    tenancyStatus, accountStatus
+    tenancyStatus, accountStatus, createLogin
   } = req.body;
   if (!fullName || !tenantId) {
     return res.status(400).json({ error: "fullName and tenantId are required" });
   }
   try {
+    // Determine if we should create login credentials immediately
+    const shouldCreateLogin = createLogin === "now";
+    let tempPassword = null;
+    let passwordHash = null;
+    let finalAccountStatus = accountStatus || "Not Set Up";
+
+    if (shouldCreateLogin) {
+      // Generate a random 8-character temporary password
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+      tempPassword = "";
+      for (let i = 0; i < 8; i++) {
+        tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      passwordHash = await bcrypt.hash(tempPassword, 12);
+      finalAccountStatus = "Active";
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO tenants (
-        landlord_id, tenant_id, full_name, phone, email, room_id, room_number, room_code,
+        landlord_id, tenant_id, full_name, phone, email, password_hash, room_id, room_number, room_code,
         monthly_rent, start_date, duration_months, end_date,
         total_contractual_rent, amount_paid, outstanding_balance,
         tenancy_status, account_status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       [
         req.user.landlordId, tenantId, fullName, phone||"", email||"",
+        passwordHash,
         roomId||null, roomNumber||"", roomCode||"",
         monthlyRent||0, startDate||null, durationMonths||0, endDate||null,
         totalContractualRent||0, amountPaid||0, outstandingBalance||0,
-        tenancyStatus||"Upcoming", accountStatus||"Not Set Up"
+        tenancyStatus||"Upcoming", finalAccountStatus
       ]
     );
-    const { password_hash, ...safe } = rows[0];
-    res.status(201).json(safe);
+    const { password_hash: _ph, ...safe } = rows[0];
+
+    // If login was created, include the temporary password so landlord can share it
+    const response = { ...safe };
+    if (tempPassword) {
+      response.temporaryPassword = tempPassword;
+      response.loginCredentials = {
+        tenantId: tenantId,
+        temporaryPassword: tempPassword,
+        message: "Share these credentials with the tenant. They can change their password after first login."
+      };
+    }
+
+    res.status(201).json(response);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to create tenant" });
